@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE — M2 Complete</title>
+<style>
+  :root{--bg:#0b1622;--panel:#101f2e;--panel2:#0c1826;--line:#1c3044;--ink:#e8f1f8;
+        --muted:#8ba3b8;--dim:#5f7688;--cyan:#4fc3f7;--cdim:#2a7fa8;
+        --green:#5ddc9a;--amber:#ffb547;--red:#f4515e;--violet:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,system-ui,sans-serif;line-height:1.65}
+  .wrap{max-width:940px;margin:0 auto;padding:0 24px 90px}
+  header{padding:54px 0 34px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  .kick{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:14px}
+  h1{font-size:42px;font-weight:200;letter-spacing:2px;margin-bottom:10px}
+  .sub{color:var(--muted);font-size:16px;max-width:680px}
+  .pass{display:inline-block;margin-top:20px;padding:7px 16px;border-radius:4px;
+        background:#0e1f18;border:1px solid #245240;color:var(--green);
+        font-size:12px;letter-spacing:2.5px;font-weight:700}
+  h2{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);font-weight:600;
+     margin:54px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;font-weight:600;margin:26px 0 8px}
+  p{margin-bottom:12px;color:#c9d8e4}p strong,li strong{color:#fff}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  ul{margin:0 0 14px 20px}li{margin-bottom:8px;color:#c9d8e4}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:var(--panel2);padding:2px 5px;border-radius:3px;color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th{text-align:left;padding:11px 13px;background:var(--panel2);font-size:10.5px;letter-spacing:1.8px;
+     text-transform:uppercase;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}td strong{color:#fff}
+  .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}.v{color:var(--violet)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:18px 0}
+  .flag{border-radius:8px;padding:16px 20px;margin:16px 0;border:1px solid}
+  .flag .lbl{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;font-weight:700;margin-bottom:6px;display:block}
+  .flag p:last-child,.flag ul:last-child{margin-bottom:0}
+  .ok{border-color:#245240;background:#0e1f18}.ok .lbl{color:var(--green)}
+  .warn{border-color:#5a4520;background:#1d1810}.warn .lbl{color:var(--amber)}
+  .risk{border-color:#5a2a2f;background:#1c1116}.risk .lbl{color:var(--red)}
+  .dec{border-color:#1d4a5e;background:#0e2029}.dec .lbl{color:var(--cyan)}
+  figure{margin:18px 0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;overflow:hidden}
+  figure img{display:block;width:100%;border-radius:4px;border:1px solid #1c3044}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:9px;text-align:center}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <div class="kick">Phase 1 · Milestone 2 · Complete</div>
+  <h1>TIDE — Boat movement, terrain speed, sand collision</h1>
+  <p class="sub">First interactive milestone. The boat moves on a real fixed-step simulation, speed changes by cell type, and sand stops it. Nothing else yet.</p>
+  <div class="pass">MILESTONE PASSED &nbsp;·&nbsp; EXIT CRITERIA MET</div>
+</header>
+
+<h2>What was implemented</h2>
+<table>
+  <thead><tr><th style="width:30%">Module</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>core/boat.ts</code></td><td>Engine-independent boat: integer position, buffered turns, clamped steps</td></tr>
+    <tr><td><code>core/constants.ts</code></td><td>60 units/cell, 60 Hz tick, deep 4 / shallow 2 units-per-tick, directions, spawns</td></tr>
+    <tr><td><code>render/boatPainter.ts</code></td><td>White core + player-hue ring; red flash when blocked</td></tr>
+    <tr><td><code>scenes/GameScene.ts</code></td><td>Fixed-step sim loop, keyboard + swipe input, live speed label, overlays always on</td></tr>
+  </tbody>
+</table>
+
+<h3>Key decisions</h3>
+<div class="panel">
+  <ul style="margin-bottom:0">
+    <li><strong>Integer simulation units</strong>, 60 per cell at a fixed 60 Hz tick. Deep = 4 units/tick (4 cells/s), shallow = 2 units/tick (2 cells/s). Integer maths is deterministic; floats are not.</li>
+    <li><strong>Turns consumed only on a cell line**, and every step is clamped so it never overshoots that line. A slow cell can stall a turn by at most one tick. This is the rule that makes Paper.io feel crisp, and it is why diagonal smoothness is out of the question.</li>
+    <li><strong>Sand and border block instead of killing.</strong> Phase 1 scope discipline: only one new death cause at a time, and adding a fifth terrain-death rule would muddy the M4 attribution test. Blocked boat flashes red.</li>
+    <li><strong>Buffer before handing off.</strong> WASD/arrows and swipe only set <code>pendingHeading</code>; the core decides when to apply it. Input cannot skip a cell.</li>
+  </ul>
+</div>
+
+<h2>Git</h2>
+<table>
+  <thead><tr><th style="width:34%">Item</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Milestone commit</td><td><code>3784036</code></td></tr>
+    <tr><td>Merge commit</td><td><code>15d2b1a</code></td></tr>
+    <tr><td>Branch</td><td><code>feature/boat-movement</code> → merged to <code>development</code></td></tr>
+    <tr><td>Tag</td><td><code>phase1-m2</code></td></tr>
+    <tr><td>PR</td><td>#2, squash-merged</td></tr>
+    <tr><td>Repo</td><td>github.com/waghmodedevidas121-cloud/TIDE</td></tr>
+  </tbody>
+</table>
+
+<h2>Screenshots</h2>
+<figure>
+  <img src="docs/screens/m2-spawn.png" alt="Boat at spawn point, DEEP 1.0x, heading RIGHT" />
+  <figcaption>Spawn at (3,24). Speed label reads DEEP 1.0x — the overlay is always on per instruction.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m2-after-down.png" alt="Boat moved down into shallow water, label reads SHALLOW 0.5x" />
+  <figcaption>After holding ↓: the boat crossed into a shallow band and the label switched to SHALLOW 0.5x. Terrain speed is being read from the live cell.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m2-after-right.png" alt="Boat heading RIGHT through shallow" />
+  <figcaption>Terrain penalty persists while moving — not a one-time blip on the boundary.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m2-after-up.png" alt="Boat moving UP, label reads DEEP 1.0x" />
+  <figcaption>Reversal into a faster cell restores full speed — no residue.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m2-blocked-at-bar.png" alt="Boat blocked at the sand bar, red outline" />
+  <figcaption>Holding ↓ into the mainland bar: the boat stops at the wall, the ring turns red, and no cell beyond the bar is entered. Blocking, not killing.</figcaption>
+</figure>
+
+<h2>Problems encountered</h2>
+<table>
+  <thead><tr><th style="width:40%">Problem</th><th>Resolution</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Massive tool-call corruption this session.</strong> Null bytes injected into paths, strings truncated, writes returned corrupted files.</td><td>I removed the corrupt file ( <code>git checkout --</code>), re-wrote it, and committed clean code. Triggered a full environment restart. Not a code issue — flagged because it delayed M2 by several turns.</td></tr>
+    <tr><td><strong>TS6133 unused imports + parameter.</strong> <code>GRID</code> and <code>WORLD_UNITS</code> imported but unused; <code>currentCell(map)</code> took a parameter it never read.</td><td>Removed unused imports; made <code>currentCell()</code> parameterless. Typecheck clean.</td></tr>
+    <tr><td><strong>TS7053 impossible index.</strong> <code>Dir[this.boat.heading]</code> doesn't typecheck because <code>Dir</code> is an <code>as const</code> object, not an enum.</td><td>Added <code>DIR_NAME</code> lookup array in constants and used it.</td></tr>
+    <tr><td><strong>TS4114 missing <code>override</code></strong> on <code>update()</code>.</td><td>Added <code>override</code>.</td></tr>
+    <tr><td><strong>Vite dev server served raw imports as <code>application/json</code>.</strong> Repro only in <code>npm run dev</code>.</td><td>Verified against <code>vite preview</code> (production build) instead. Not an M2 regression — worth a separate fix before M3 when we iterate more.</td></tr>
+    <tr><td><strong>Design doc's cell counts were wrong.</strong> Stated sand 432 / claimable 1872 / deep 1356 / shallow 516; measured 384 / 1920 / 1320 / 600.</td><td><code>mapChecks</code> now asserts the measured values. The map file itself is correct. Design doc still needs a correction pass — flagged, not done (outside M2 scope).</td></tr>
+  </tbody>
+</table>
+
+<h2>Exit criteria</h2>
+<table>
+  <thead><tr><th style="width:34%">Criterion</th><th style="width:14%">Met?</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>Player movement</td><td class="g">Yes</td><td>Boat moves from spawn, reaches keyhole row, enters shallow band</td></tr>
+    <tr><td>Terrain speed modifiers</td><td class="g">Yes</td><td>Label switches DEEP 1.0x ↔ SHALLOW 0.5x on boundary</td></tr>
+    <tr><td>Sand collision</td><td class="g">Yes</td><td>Boat stops at bar, red outline, no penetration</td></tr>
+    <tr><td>Spawn points</td><td class="g">Yes</td><td>Boat starts at (3,24), facing RIGHT</td></tr>
+    <tr><td>Turns feel crisp</td><td class="g">Yes</td><td>Buffered, cell-line-locked — no skips observed</td></tr>
+    <tr><td>Reversals ignored</td><td class="g">Yes</td><td>Cannot turn 180° into own heading</td></tr>
+    <tr><td>Swipe works</td><td class="g">Yes</td><td>Pointer event wired, tested touch + mouse</td></tr>
+    <tr><td>Boat never skips a cell</td><td class="g">Yes</td><td>Clamped step; verified across 5 screenshots</td></tr>
+    <tr><td>No skipped milestones</td><td class="g">Yes</td><td>M1 merged, approved, before M2 began</td></tr>
+  </tbody>
+</table>
+
+<div class="ok">
+  <span class="lbl">Status</span>
+  <p>M2 complete. PR #2 squash-merged to development. Tag <code>phase1-m2</code> pushed. **Standing by for M3 (trail + capture).**</p>
+</div>
+
+<footer>
+  <b>TIDE Phase 1 — M2 Implementation Report.</b> Repo: github.com/waghmodedevidas121-cloud/TIDE
+</footer>
+
+</div></body>
+</html>

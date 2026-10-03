@@ -11,3 +11,4 @@ npm-debug.log*
 shots/
 *.png
 !public/**/*.png
+!docs/screens/*.png
