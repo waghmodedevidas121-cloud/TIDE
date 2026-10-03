@@ -22,6 +22,7 @@ import {
 } from './constants';
 import { isPassable } from './terrain';
 import { terrainAt, type GameMap } from './mapLoader';
+import { Trail } from './trail';
 
 export interface BoatSnapshot {
   readonly row: number;
@@ -40,20 +41,23 @@ export class Boat {
   posX: number;
   posY: number;
   blocked = false;
+  ownerId: number;
+  readonly trail = new Trail();
 
-  constructor(row: number, col: number, heading: Dir = Dir.DOWN) {
+  constructor(row: number, col: number, heading: Dir = Dir.DOWN, ownerId = 1) {
     this.row = row;
     this.col = col;
     this.heading = heading;
     this.pendingHeading = heading;
     this.posX = col * UNITS_PER_CELL;
     this.posY = row * UNITS_PER_CELL;
+    this.ownerId = ownerId;
   }
 
-  static atSpawn(index: number, heading: Dir = Dir.DOWN): Boat {
+  static atSpawn(index: number, heading: Dir = Dir.DOWN, ownerId = 1): Boat {
     const spawn = SPAWNS[index];
     if (!spawn) throw new Error(`no spawn point ${index}`);
-    return new Boat(spawn.row, spawn.col, heading);
+    return new Boat(spawn.row, spawn.col, heading, ownerId);
   }
 
   /** Queue a heading change. A reversal is rejected -- you cannot turn into
