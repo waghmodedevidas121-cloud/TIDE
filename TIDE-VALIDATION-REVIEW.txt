@@ -1,0 +1,1267 @@
+================================================================================
+                        T I D E
+              PROJECT VALIDATION REVIEW  (PRE-GREENLIGHT GATE)
+================================================================================
+
+  Prepared by : Game Director / Systems Design / Product Design / Tech Architecture
+  Stage       : Pre-implementation. Nothing built. Nothing modified.
+  Recommendation: See SECTION 10.
+
+  TL;DR: The tide cycle is dead. Keep the water, keep the name, throw the
+  cycle away. What replaces it is cheaper, clearer, and nobody in the genre
+  is doing it.
+
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+We spent three phases pitching TIDE as "Paper.io with a tide cycle." This
+review read the actual Paper.io source, seven competitors, and the retention
+math of the genre. It reached a different conclusion than we expected.
+
+Five findings decide this project.
+
+1. TERRITORY IS ERASED ON DEATH. All of it. Not kept, not transferred --
+   deleted, and immediately claimable by anyone.
+   Verified in source: core/index.js:94-98
+   The genre's death penalty is ALREADY AT ABSOLUTE MAXIMUM.
+   TIDE's passive erosion was designed to sit underneath a punishment that
+   has no room underneath it.
+
+2. ZERO-MAINTENANCE TERRITORY IS LOAD-BEARING, NOT A MISSING FEATURE.
+   Territory here is a permanent asset with no upkeep, bought by spending a
+   temporary liability (your tail). That one property is what makes greed
+   PROVABLY OPTIMAL and the resource satisfying. Erosion does not deepen
+   this system. It changes what the resource IS.
+
+3. BOTH DIRECT COMPETITORS ALREADY SOLVED "ADD DEPTH TO PAPER.IO" --
+   AND NEITHER USED AN ENVIRONMENTAL CYCLE.
+   Paper.io 2 added smooth 360-degree control, a circular arena, power-ups,
+   country-map progression, stat challenges.
+   Hexanaut.io added a KING endgame, five map-object totems, a ranked
+   ladder, duo teams, weekly rule sets.
+   The innovation axis TIDE wanted is already occupied.
+
+4. THE ONLY REAL WHITE SPACE IS A DESIGNED, READABLE, STATIC MAP.
+   Nobody in the competitive set has one as the central strategic object.
+   Paper.io 1's arena is a blank white square.
+   Paper.io 2's is a blank circle.
+   Hexanaut's is hexagons plus five totems.
+   Territorial.io has water -- but it is a grand-strategy simulation, not
+   an arcade game.
+   A bathymetric archipelago where the shape of the seabed decides every
+   route? Unoccupied. Cheap. Instantly legible.
+
+5. THE BIGGEST FLAW IS NOT MECHANICAL. THE GAME HAS NO SHAPE.
+   No timer. No round. No end. No results screen. No respawn. No
+   progression. No persistence.
+   It is an excellent five-minute toy and a poor twenty-match game.
+   Every one of those gaps costs less to close than any environmental
+   gimmick, and every one of them is worth more player-minutes.
+
+
+VERDICT: B -- IMPROVE TIDE.
+
+Confidence:
+  74%  Revised TIDE (bathymetry + King endgame) deserves a greenlight
+  19%  Tide-cycle TIDE deserved a greenlight
+   7%  One of the ten alternatives is stronger
+
+Section 6 has the fallback if this flops: TESSERA.
+
+
+================================================================================
+SECTION 1 -- RESEARCH FINDINGS  (Paper.io, source-level)
+================================================================================
+
+Repo cloned read-only, 33 files, ~1,700 lines of source. Nothing modified.
+
+
+1.1 FOLDER STRUCTURE
+--------------------------------------------------------------------------------
+  server.js           HTTP + Socket.IO, 60Hz setInterval, forks N bot processes
+  config.js           single tuning file + consts (grid, cell, speed, cap)
+  client.js           browser entry: keys + swipe, menu, name, wiring
+  bot.js              BROKEN -- undeclared globals, ReferenceError under ESM
+  paper-io-bot.js     ACTIVE -- headless client bot, deobfuscated Paper.io AI
+  src/
+    game-client.js    socket lifecycle, frame counter, desync resync, 3s timeout
+    game-server.js    player list, join/leave, colour pool, snapshot encode
+    core/             <-- THE SHARED SIMULATION (server + client + bots)
+      index.js          updateFrame: movement, all collisions, death cleanup
+      player.js         Player + Tail: movement, RLE trail, fillTail, floodFill
+      grid.js           sparse 2D array with change callback
+      stack.js          preallocated array-backed stack (GC avoidance)
+      color.js          HSL colour, interpolation, 81-colour shuffled palette
+    mode/
+      player.js         viewport-culled Canvas 2D renderer, drop-shadow grid,
+                       HUD, zoom = 1/(portion+1)
+      god.js            spectator renderer (same grid, free camera)
+  public/             index.html, styles.css, fonts, images, music, bundle.js
+
+THE DECISION EVERYTHING HANGS OFF:
+  src/core/ is imported BYTE-FOR-BYTE IDENTICALLY by the server, the browser,
+  and every bot process. There is ONE simulation, not three. Every other
+  decision in this codebase -- including the entire networking model --
+  follows from that single choice.
+
+
+1.2 CLIENT ARCHITECTURE
+--------------------------------------------------------------------------------
+  client.js --> game-client.js --> core/* --> mode/player.js
+   input        socket + frame       THE SIM     Canvas 2D + HUD
+   name/menu    resync + timeout      (shared)    zoom = 1/(portion+1)
+
+  INPUT   WASD / arrows, plus swipe resolved on touchend.
+          ONE control, four directions.
+          This is the entire control scheme. Do not add a second one.
+
+  MOVE    Position is continuous, BUT a heading change is only applied when
+          both coordinates sit on a cell boundary. Input is latched into
+          tmpHeading and consumed at the next cell line.
+          THIS SINGLE RULE is why the game feels crisp. Lose it and the game
+          feels like syrup.
+
+  HUD     name | own % (3 decimals) | kills | rank "X of N" | top-5 rolling bars
+
+  ZOOM    1/(portion+1) -- owning more map literally shows you more map.
+          Six characters of code that make growth feel like power.
+
+  RENDER  Canvas 2D, double-buffered offscreen, viewport-culled static pass,
+          drop-shadow cell extrusion, 2-stage drop-in bounce over 24 frames,
+          rolling HUD interpolation.
+
+
+1.3 SERVER ARCHITECTURE
+--------------------------------------------------------------------------------
+  server.js
+    |- mimi-server (express + static)
+    |- Socket.IO
+    |- game-server.js --> core/*   (the same files)
+    |- setInterval(1000/60) --> tick()
+    `- fork(paper-io-bot.js) x config.bots
+
+  KEY POINT: the server is an authority over INPUTS and MEMBERSHIP.
+  It is NOT an authority over POSITIONS.
+  It validates headings are integers in [0,4) and rejects future frames.
+  It does not verify positions at all. (See 1.11.)
+
+
+1.4 TERRITORY OWNERSHIP
+--------------------------------------------------------------------------------
+  Ownership IS the grid cell value.
+  Grid = sparse 2D array of Player object references, or null.
+  No IDs. No bitsets. No packed ints.
+
+    - 100 x 100 = 10,000 cells, 40px each -> 4000 x 4000px world
+    - spawn stamps a 3x3 block
+    - spawn picks a UNIFORMLY RANDOM empty 3x3 anywhere, so the board fills
+      from every direction at once
+    - wire format is Uint8Array(10000) of 1-based player indices
+      -> hard ceiling of 64 encodable players
+    - percentage is free: client keeps a running counter, +1 per cell write
+
+  *** CRITICAL BEHAVIOUR ***
+  On death, a full-board sweep sets every cell owned by the dead player to
+  null. Territory is DELETED. It returns to neutral for anyone to claim.
+
+  This is the single most important mechanic in the game and it is invisible
+  in the source's own design docs. The map is a RENEWABLE RESOURCE, and
+  death is a redistribution event -- not just a loss.
+
+
+1.5 TRAIL SYSTEM -- best engineering in the repository
+--------------------------------------------------------------------------------
+  The trail is stored TWICE. Each form is optimal for its own job.
+
+    Representation                  | Job           | Complexity
+    ---------------------------------+---------------+------------------
+    RLE segments {orientation, move} | store + draw  | O(segments)
+    sparse bool grid `tailGrid`      | collision     | O(1) array lookup
+
+  A 400-cell trail around a big territory is ~12 segments.
+  Trail handling has no performance problem at all, ever.
+
+  VERDICT: port this verbatim. It is the best 20 lines in the codebase.
+
+
+1.6 AREA CAPTURE ALGORITHM
+--------------------------------------------------------------------------------
+  Fires the instant the player's centre enters a cell it owns.
+
+    fillTail:  BFS across every cell the trail touches
+                 mark been
+                 claim the trail cell itself
+                 floodFill from all 4 neighbours
+
+    floodFill: expand until blocked:
+                 out of bounds    -> surrounded = false -> NO CAPTURE
+                 already been      -> stop
+                 on trail          -> stop
+                 own territory     -> stop
+               if surrounded: write the entire filled Stack to the player
+
+  THE TRICK WORTH STEALING:
+  One shared `been` grid across all flood fills. The first flood that escapes
+  marks the whole outside as visited, so every later flood correctly finds
+  only the enclosed interior. Topology falls out of the exclusion set for
+  free. No "am I inside?" computation anywhere.
+
+  Cost is O(region) on loop closure, zero otherwise. Worst case 10,000 cells.
+  Fine at 30 players.
+
+
+1.7 COLLISION DETECTION
+--------------------------------------------------------------------------------
+  One O(n^2) pass. Four rules. Every one of them is legible to the player.
+
+    Out of bounds      Death. The border is drawn grey, so you see it first.
+    Body -> tail       You die. O(1) via tailGrid. Dominant death in the game,
+                       and always self-inflicted.
+    Body -> body       AABB overlap.
+                         IF victim is on their OWN land -> AGGRESSOR dies.
+                         Otherwise the player with the smaller area(p) loses,
+                         where area(p) = distance travelled into the current
+                         cell. Equal -> both die.
+    Death cleanup      Full-board sweep nulls the dead player's cells.
+
+  The area(p) tiebreak is a genuinely good rule: deterministic, no randomness,
+  sub-frame-arbitrary. You lose because you were less committed to the cell
+  you were entering. That reads as fair.
+
+
+1.8 BOT BEHAVIOUR
+--------------------------------------------------------------------------------
+  *** THERE IS NO SERVER-SIDE AI. ***
+  Bots are separate OS processes that import the same game-client.js and
+  connect over WebSocket exactly like a human. Zero lines of AI in the
+  authoritative process.
+
+  Three states, driven by map share:
+      threshold = (0.05 + 0.1 * random) * 10000
+
+    EXPLORE | on own land
+      Raycast 4 directions x 20 cells.
+        +30*(30-S) toward cells under an ENEMY TAIL   (steering into a kill)
+        -1 per cell not already yours
+        -1 toward the edge
+        straight = 100, reverse = -9999
+      Weighted random pick.
+
+    CLAIM | outside, share < 5-15%
+      Execute a PRE-GENERATED RANDOM RECTANGLE:
+      sides = [breadth, length, breadth+2..3, length], each 2-6 cells,
+      clockwise or counter-clockwise at random.
+      This is the entire expansion algorithm.
+
+    RETURN | outside, share >= 5-15%
+      Same raycast, but -(50-S) for own tail, +(10+S) toward own territory.
+      It homes.
+
+  THE ENTIRE AI DESIGN IS ONE LINE: small bots expand, large bots survive.
+  Transparent to the player within two encounters.
+
+
+1.9 RENDERING APPROACH
+--------------------------------------------------------------------------------
+  Canvas 2D. Not WebGL.
+
+  THE ENTIRE VISUAL IDENTITY IS TWELVE LINES OF CODE.
+  SHADOW_OFFSET draws a 5px darker rect beneath a cell, but only when the
+  cell below is unclaimed. That fakes paper extrusion. That single trick is
+  the whole "paper" look. Keep the idea. Exaggerate it.
+
+  Palette discipline is free legibility:
+  81 colours, fixed L = 0.5, hues restricted to 0-220 to dodge the
+  indistinguishable blue/purple band, three saturations, shuffled,
+  recycled on death.
+
+
+1.10 PERFORMANCE -- honest assessment
+--------------------------------------------------------------------------------
+  SEVERITY  ISSUE
+  --------  ---------------------------------------------------------------
+  HIGH      Array.shift() in both BFS loops. O(n) per shift, so the capture
+            BFS is O(n^2) in region size. Masked only because captures are
+            small and rare.
+  HIGH      Full 100x100 sweep EVERY FRAME. After the culled static pass, a
+            second loop iterates all 10,000 cells per frame purely to advance
+            animation counters. 600k iterations/sec of pure waste.
+  MED       setInterval as the fixed step. Drifts, jitters, no accumulator.
+            And config.fps: 30 is NEVER REFERENCED ANYWHERE. Dead config.
+  MED       10KB full resync on ONE dropped frame. data.frame-1 !== frame is
+            strict. No interpolation, so latency reads as visible stutter.
+            Bandwidth scales with players^2.
+  MED       3-second hard timeout. A network hiccup ends the session instead
+            of degrading it.
+  LOW       O(n^2) player collision. 30 players = 900 pairs/tick. Breaks
+            somewhere past 200.
+
+
+1.11 VERIFIED DEFECTS
+--------------------------------------------------------------------------------
+  ANTI-CHEAT DESIGNED, NEVER WIRED
+    verifyPlayerLocations() keeps 300 frames of position history and
+    validates client claims -- and is NEVER CALLED. Positions are never
+    verified. Only input legality is checked.
+
+  NO KILL ATTRIBUTION
+    updateFrame's notifyKill parameter is never passed by the server, so the
+    internal kill() is a no-op. THE SERVER NEVER TELLS YOU WHO KILLED YOU.
+    The client guesses its own kill count; nobody can attribute a death.
+
+  bot.js IS NON-FUNCTIONAL
+    Assigns `steps` and `distWeights` without declaration -- ReferenceError
+    under ESM strict mode. generateLandDirections and LAND_CLAIMS are empty
+    stubs. Masked because the server forks a different file.
+
+  LEAKED LOOP VARIABLE IN THE ACTIVE BOT
+    paper-io-bot.js:93 reads `o` (the leaked `for (var o of others)` variable)
+    instead of `tailed`. The "don't kill our own kind" heuristic tests the
+    wrong player and is effectively random.
+
+  DEAD UI
+    #mode and #skins buttons have zero handlers. A 2.6MB unlicensed Gwent
+    OST plays through a raw <audio controls> tag.
+
+  ZERO TESTS, NO CI. README warns config.js needs a manual rebuild after
+  every edit.
+
+
+================================================================================
+SECTION 2 -- GAMEPLAY ANALYSIS  (code ignored)
+================================================================================
+
+2.1 THE THREE LOOPS
+--------------------------------------------------------------------------------
+  MICRO-LOOP (~1 second)
+    Choose a heading -> commit to a line of cells -> watch the % counter.
+    8 ticks to a cell centre + 24 frames of HUD interpolation
+    = ~0.4 SECONDS from input to visible number.
+    That latency IS the game feel. Everything else is decoration on top.
+
+  EXPANSION LOOP (~10-40 seconds)
+    Leave territory -> carve a loop -> return -> bank.
+    This is what players actually think about. Its LENGTH is the risk dial.
+
+  SESSION LOOP -- DOES NOT EXIST
+    No timer, no end, no result. The world runs until the board fills.
+    No satisfying beat. No natural exit point. This is the gap.
+
+
+2.2 THE RISK LOOP -- the math nobody explains
+--------------------------------------------------------------------------------
+  A loop of perimeter P encloses roughly P^2/16 area, while exposing P cells
+  of tail.
+
+  >>> REWARD IS SUPERLINEAR IN EXPOSURE. <<<
+  Bigger loops are MORE EFFICIENT, not riskier.
+
+  Combined with zero maintenance cost, greed is not merely tempting.
+  Greed is PROVABLY CORRECT.
+
+  THE CONSEQUENCE NOBODY NAMES:
+  The area-maximising shape is a VERY LONG, VERY THIN RECTANGLE, and the
+  best place to draw it is HUGGING YOUR OWN EXISTING BORDER.
+
+  That is why every Paper.io territory in every screenshot is a ribbon or a
+  comb, never a square.
+
+  THE GENUINE CORE SKILL IS CONTOUR-FOLLOWING YOUR OWN FRONTIER.
+  And it is PURELY SPATIAL. Zero time component.
+
+
+2.3 THE REWARD LOOP
+--------------------------------------------------------------------------------
+  Area, as a live % of the map, normalised against the leader, 3 decimals.
+
+    1. CONTINUOUS   it never stops moving
+    2. NORMALISED   leaderboard rescales all bars to rank 1, so the gap is
+                    always visible and always apparently closeable
+    3. CAMERA-COUPLED  zoom = 1/(portion+1). Growth literally widens your
+                    view. Success FEELS like a wider world.
+
+
+2.4 WHY EXPANSION FEELS GOOD
+--------------------------------------------------------------------------------
+  - It is PERMANENT. Banking is free, irreversible, costs nothing to hold.
+    No upkeep, no decay, no vulnerability to what you already own.
+  - It is CAUSALLY INSTANT. 0.4s from action to number.
+  - It is ANIMATED. Each capture drops cells in with a bounce.
+  - It is SOCIALLY RANKED. The number is attached to your name and compared
+    to strangers.
+
+
+2.5 WHY PLAYERS BECOME GREEDY
+--------------------------------------------------------------------------------
+  Greed is CORRECT .............. reward superlinear in exposure
+  Hoarding is UNPUNISHED ....... zero maintenance cost, so no reason to ever
+                                  risk anything past ~15%
+  Success FEELS like power ...... camera zooms out as you grow
+  Falling behind raises risk ... leaderboard bars normalised to rank 1
+                                  (a rubber band made of UI)
+
+  There is no in-game counter-pressure. The game never tells you greed is
+  wrong, because in this system it isn't.
+
+
+2.6 WHY DEATHS FEEL FAIR
+--------------------------------------------------------------------------------
+  1. TOTAL LEGIBILITY
+     Your tail is drawn in full, always. Territory is drawn in full. Every
+     enemy is drawn. You can enumerate what will kill you by looking at the
+     frame BEFORE it happens.
+  2. ALMOST ALWAYS SELF-INFLICTED
+     The dominant death is your own tail, which you drew, and which is on
+     screen. Self-inflicted death always feels earned.
+  3. HOME IS GENUINELY SAFE
+     A bigger player who collides with you ON YOUR OWN LAND dies instead.
+     The game promises home is safe and honours it. This one rule is what
+     makes 20% of the map feel defensible.
+  4. NO CHEAP SPAWN DEATHS
+     One second of frozen spawn.
+
+  BUT THE PUNISHMENT IS ABSOLUTE.
+  Fairness is not leniency. You lose 100% of your land.
+  What makes that survivable is not a mechanic -- it is that there is NO
+  RESPAWN, so the death screen becomes a processing buffer.
+
+  >>> DOWNTIME SUBSTITUTES FOR PUNISHMENT. <<<
+  There is NO HEADROOM beneath this for a second, passive loss.
+
+
+2.7 WHY REPLAYABILITY EXISTS
+--------------------------------------------------------------------------------
+  - ONE CLICK BACK. Nothing to lose but the run.
+  - NOTHING PERSISTS. No currency, no unlocks, no meta.
+  - THE MAP IS RECYCLED. Every death returns a chunk to neutral, so the
+    world visibly reopens -- players read that as FRESH OPPORTUNITY, not as
+    a death. This is the dominant macro loop, and it is fully emergent and
+    completely free.
+  - ZERO WAITING. No queue, no countdown, no loading.
+
+
+2.8 FIRST 30 SECONDS / 3 MINUTES / 10 MINUTES
+--------------------------------------------------------------------------------
+FIRST 30 SECONDS
+  - The first screen asks for a NAME. Only customisation in the game,
+    requested BEFORE play. Manufactures ownership of the identity you get
+    ranked against.
+  - A pings/pongs socket round-trip gates the Play button. Free
+    connectivity probe disguised as nothing.
+  - Spawn: 3x3 territory, 1s freeze, camera centred, zoom ~0.9, so you see
+    about a fifth of the map.
+  - THE HUD ALREADY EXPLAINS THE GOAL IN UNDER TWO SECONDS with zero words
+    of tutorial: your % (already 0.09%), Kills: 0, Rank: X of N, five bars.
+  - First accidental rectangle lands inside ~15s -- spawn block is tiny and
+    adjacent.
+  - THE % COUNTER IS THE TEACHER. It is the entire tutorial. Zero cost.
+
+FIRST 3 MINUTES
+  - 2-3 successes and at least one death, almost certainly self-inflicted,
+    therefore absorbed without resentment.
+  - THE RIBBON SHAPE APPEARS. The player stops drawing squares and starts
+    drawing long thin claims along their own border. Nobody tells them.
+    This is the moment the game is actually learned.
+  - The leaderboard becomes an ENEMY. Rank 1 is a person, not a concept.
+  - The first real strategic decision -- TURTLE OR RUN -- is made
+    implicitly, and most players never notice they chose.
+
+FIRST 10 MINUTES
+  - 25-40% claimed. Neutral space fragmented into awkward pockets.
+  - The game has silently changed phase. Expansion is no longer easy, so the
+    fastest growth path is now KILLING SOMEONE -- because their land returns
+    to neutral and you were often already outside waiting for it.
+  - Deaths frequent and expensive. The map visibly BREATHES as big players
+    die and re-flood neutral ground.
+    THIS IS THE BEST EMERGENT DRAMA IN THE GENRE AND IT IS UNSCRIPTED.
+  - THEN THE GAME RUNS OUT. No neutral space left, nothing to switch to.
+    Players stall, get picked off, leave. No endgame to migrate into.
+
+
+================================================================================
+SECTION 3 -- COMPETITIVE ANALYSIS
+================================================================================
+
+3.1 COMPARISON
+--------------------------------------------------------------------------------
+PAPER.IO (the clone)
+  Resource : Unclaimed cells; exposure length
+  Risk     : Own tail + map edge + bigger players outside
+  Reward   : Area as % of map, normalised to leader
+  Keeps you: 0.4s feedback loop; zoom-out on growth; normalised leaderboard;
+             recycled map on death; zero cost of death
+  Weak     : NO GAME AT ALL -- no timer, no round, no end, no respawn, no
+             persistence, no mastery feedback. Optimal play degenerate
+             (turtle at 15%). One room, 30 players. Mobile input resolves on
+             touchend, so input latency = swipe duration.
+
+PAPER.IO 2 (Voodoo)
+  Resource : Same, plus speed that scales with area, plus random speed pickups
+  Risk     : Trails can be crossed. Walls no longer kill.
+  Reward   : Area % + revive offers + stat challenges
+  Keeps you: 360-DEGREE SMOOTH CONTROL (cursor/finger follow) -- huge feel
+             upgrade; circular arena; power-ups; COUNTRY-MAP PROGRESSION
+             (US first, then neighbours); stat challenges unlock minimap;
+             "learn by dying", no tutorial
+  Weak     : Bots only, no humans. Emergent difficulty is BRUTAL (same bot
+             count, less space = constant contact). 100% clear nearly
+             impossible. Known territory-loss bug. Aggressive interstitial
+             cadence (~2 min, reframed as "Break Time").
+
+HOLE.IO
+  Resource : Time (round clock) + size
+  Risk     : NOTHING. You cannot die.
+  Reward   : Consumed area; size gates what you can eat
+  Keeps you: 2-minute round, perfect escalation curve, frictionless
+             onboarding, zero punishment
+  Weak     : ZERO RISK. No tension, no comeback drama, no reason to fear
+             anything. Depth capped at "route efficiently".
+
+AGAR.IO
+  Resource : Mass (= size = inverse speed)
+  Risk     : Bigger players
+  Reward   : Eating smaller players; leaderboard
+  Keeps you: Genuine PvP stakes; split mechanic; huge skill ceiling; massive
+             established audience
+  Weak     : NO TERRITORY AT ALL. A presence game, not a control game.
+             Steep onboarding. Laggy on mobile. Long respawns.
+
+SLITHER.IO
+  Resource : Length / mass
+  Risk     : Bodies and walls
+  Reward   : Absorbing smaller worms; leaderboard
+  Keeps you: Pure twitch reflex; instant onboarding; massive audience
+  Weak     : No territory, no depth, solved within weeks, feels cheap.
+             Body-collision rules are opaque.
+
+HEXANAUT.IO
+  Resource : Hexagons; stackable speed totems
+  Risk     : Tail slicing. ONCE A KING EXISTS YOU CANNOT RESPAWN.
+  Reward   : Reach 20% -> become King -> hold for 3 minutes -> WIN
+  Keeps you: THE KING ENDGAME IS THE GENRE'S BEST ANSWER TO "THE GAME RUNS
+             OUT". Five totems (Spreading laser / Speed / Teleport / Slowing
+             / Spy Dish) are MAP OBJECTIVES that create real strategic
+             choice. Duo teams. Weekly rotating rules. Copper->Elite ladder.
+             Coins and cosmetics. Up to 45 players.
+  Weak     : Mouse-follow control is hard on mobile. 5 totems is a lot to
+             teach. The King phase can feel like a passive siege.
+             Bot fill replaces real players.
+
+TERRITORIAL.IO
+  Resource : BALANCE (compound-interest economy) + pixel territory
+  Risk     : Conquering a nation requires DOUBLING their defence
+  Reward   : Balance -> interest income -> conquest; clans; ELO
+  Keeps you: Deep economy; clan play; custom JSON scenarios; 1v1 ELO ladder;
+             battle royale mode; a genuine grand-strategy ladder
+  Weak     : NOT AN ARCADE GAME -- requires reading a wiki. Interest curves
+             and ELO need enormous balance work. Inactivity ELO decay. One
+             creator's labour of love.
+             *** ALREADY CONTAINS WATER AND SHIPS. So "water + economy" is
+                 NOT novel. ***
+
+
+3.2 WHAT THE COMPETITIVE SET PROVES
+--------------------------------------------------------------------------------
+  1. THE ENDGAME IS THE MISSING PIECE, AND HEXANAUT SOLVED IT ELEGANTLY.
+     "Reach 20% -> become King -> survive 3 minutes while everyone hunts you"
+     converts Paper.io's exhausted endgame into a SIEGE.
+     Cost: one threshold and one timer.
+     WE SHOULD COPY THIS.
+
+  2. MAP OBJECTS CREATE STRATEGY FOR FREE.
+     Hexanaut's five totems produce more decision depth than Paper.io 2's
+     entire power-up system, because they are PLACES ON THE MAP you must
+     choose to visit, not pickups that happen to you.
+     THIS IS HOW YOU ADD DEPTH WITHOUT ADDING A CLOCK.
+
+  3. PROGRESSION IS TABLE STAKES, NOT OPTIONAL.
+     Paper.io 2 has country-map progression. Hexanaut has a nine-tier ladder,
+     coins, cosmetics, weekly modes. Territorial.io has clans and ELO.
+     OUR CLONE HAS NONE OF IT.
+
+  4. THE GENRE'S BAR HAS MOVED PAST CONTROL SCHEMES.
+     Paper.io 2 abandoned 4-direction grid movement for 360-degree smooth
+     following. That one change is why it feels better to play.
+     It also has a hard architectural consequence we must respect (Section 5).
+
+  5. TWO CREDIBLE DESIGNS BRACKET THE GENRE.
+     Paper.io 2 = fast, accessible, zero risk, no depth.
+     Territorial.io = deep, slow, high risk, unreadable.
+     THE UNOCCUPIED MIDDLE IS A FAST, READABLE GAME WITH ONE GENUINELY DEEP
+     DECISION. That is where TIDE should live.
+
+
+3.3 THE ACTUAL WHITE SPACE
+--------------------------------------------------------------------------------
+  Every game in the set has a BLANK or GENERIC arena:
+    Paper.io     : a blank white square
+    Paper.io 2   : a blank circle
+    Hexanaut.io  : hexagons plus five totems
+    Agar/Slither : uniform empty space
+    Territorial : pixel terrain with mountains and water, but a simulation
+
+  NOBODY HAS MADE THE MAP ITSELF THE PRIMARY STRATEGIC OBJECT.
+
+  A designed, readable, static bathymetric map -- where the shape of the
+  seabed determines every route, and the silhouette is the thing you
+  recognise in a thumbnail -- is unoccupied, cheap to build, and instantly
+  legible.
+
+
+================================================================================
+SECTION 4 -- PLAYER PSYCHOLOGY ANALYSIS
+================================================================================
+
+  Paper.io's engagement runs on a tight causal chain:
+      I drew this line -> therefore I own this land -> therefore this number
+      moved -> therefore I am good at this.
+
+  TIDE INSERTS A THIRD LINK ("unless the water rises") THAT THE PLAYER DOES
+  NOT CONTROL. Every inserted link between effort and result weakens the
+  sense of competence. A tide is a link the player cannot author.
+
+  DRIVE             MECHANISM                     TIDE HURTS?
+  ----------------- ----------------------------- --------------------
+  Control           banking is permanent + free   HURTS. Erosion makes
+                                                  banking conditional:
+                                                  control becomes tenancy.
+
+  Greed             reward superlinear            HURTS. The surge multiplier
+                                                  adds a second greed axis
+                                                  that COMPETES with the
+                                                  first rather than deepening.
+
+  Fair death        legible, self-inflicted,      HURTS BADLY. A passive loss
+                    safe home, 100% loss         on top of total loss is
+                                                  UNEARNED, and players
+                                                  blame the game for it.
+
+  Attribution       you drew your own tail        HURTS. "The tide took it"
+                                                  removes the player from the
+                                                  causal chain.
+
+  Competence        contour routing, visible in   NEUTRAL/POSITIVE. A readable
+                    your own territory shape      archipelago makes route
+                                                  mastery MORE visible than
+                                                  a blob does.
+
+  Spatial mastery   spatial skill, learned by     HURTS. A tide adds a timing
+                    observation                   dimension that cannot be
+                                                  learned by watching shapes.
+
+  Social presence   leaderboard + 20% camera      MIXED. A 40s global clock
+                                                  phase-aligns everyone into
+                                                  a shared rhythm, reducing
+                                                  emergent variety.
+
+  Session closure   NONE -- THIS IS THE GAP       TIDE DOES NOT FIX IT.
+                                                  A 3-minute round does.
+
+
+================================================================================
+SECTION 5 -- TECHNICAL ANALYSIS
+================================================================================
+
+Six decisions the source evidence forces on us:
+
+  #  DECISION                     WHY THE EVIDENCE FORCES IT
+  -  ---------------------------  ----------------------------------------------
+  1  4-direction, turn-at-cell-   This rule is why the clone feels crisp.
+     boundary, buffered input     Paper.io 2 abandoned it for 360 degrees and
+                                  gained expressiveness -- but 360-degree
+                                  CONTINUOUS movement is fundamentally hostile
+                                  to deterministic lockstep: every client
+                                  float must match bit-for-bit. We want the
+                                  shared-core architecture. WE KEEP
+                                  4-DIRECTION. NON-NEGOTIABLE.
+
+  2  Shared deterministic core    One core imported by server, client, bots.
+                                  Halves network cost. Headless bots become
+                                  trivial. CONSTRAINT: zero randomness and
+                                  zero float drift inside the core. Any
+                                  randomness lives on the server and is
+                                  transmitted.
+
+  3  RLE trail + sparse grid      Best engineering in the repo. Port verbatim.
+
+  4  Safe-zone collision rule     A bigger player who runs into you on your
+                                  own land dies. Best rule in the game.
+
+  5  Flat typed arrays, NOT       The clone stores Player references per cell.
+     object references            For WebGL + dirty-region redraws we want a
+                                  flat Uint8Array of owner IDs plus a
+                                  separate terrain array.
+                                  DO NOT PORT THE REFERENCE MODEL.
+
+  6  THE SIMULATION CORE MUST     Phaser owns its scene graph, input and
+     NOT DEPEND ON PHASER         update loop. To run a DETERMINISTIC shared
+                                  core at a fixed 10Hz tick with server/client
+                                  lockstep, TIDE must run the simulation as a
+                                  PLAIN TYPESCRIPT MODULE WITH NO PHASER
+                                  DEPENDENCY, using Phaser purely as a
+                                  renderer that consumes simulation state.
+                                  *** This cuts against the brief's "Phaser 3"
+                                  instruction and is the single most
+                                  important architectural decision in the
+                                  project. ***
+
+PHASED NETWORK BUDGET -- what we must not repeat:
+  - heading-only per-frame deltas
+  - full-state snapshot on join and on desync only
+  - entity interpolation
+  - delta region updates instead of full-board snapshots
+  - DEGRADE on packet loss, never disconnect
+
+
+================================================================================
+SECTION 6 -- TIDE VALIDATION  (brutally honest)
+================================================================================
+
+6.1 WHY PLAYERS WILL CALL IT "PAPER.IO WITH WATER"
+--------------------------------------------------------------------------------
+  THE VERB IS IDENTICAL
+    Paper.io: leave a trail, enclose, return. TIDE: leave a trail, enclose,
+    return. The tide is a MODIFIER, not a verb.
+    Proof: replace it with wind, a storm, or a shrinking arena and the game
+    is equally "fine."
+    >>> SWAPPABLE WITHOUT CHANGING THE GAME = GIMMICK BY DEFINITION. <<<
+
+  IT CANNOT BE SCREENSHOTTED
+    Identity comes from readable states and silhouettes. Water level is
+    ATMOSPHERIC. A still frame communicates nothing about game state.
+    Paper.io's screenshot is instantly legible. TIDE's is a blue blur.
+
+  IT IS NOT A VERB
+    The tide-specific actions are WAIT and GAMBLE. Both are reactions to a
+    timer. There is no move you make BECAUSE OF the tide that has no Paper.io
+    analogue. Hole.io's verb is CONSUME. Snake's is STEER.
+    TIDE contributes a SCHEDULE.
+
+  IT CONTRADICTS THE BRIEF'S OWN SUCCESS CONDITION
+    The brief demands comprehension, capture, risk, death and bot competition
+    WITHIN 2 MINUTES. The tide requires teaching FIVE CONCEPTS before the
+    first input: a clock, a water level, erosion rules, a current field, a
+    multiplier. The tide is in direct contradiction with the project's own
+    definition of success.
+
+  TWO CLOCKS IS ONE TOO MANY
+    Match timer plus a 40s tide cycle. The tide is more urgent, so the match
+    timer becomes noise. Or the match timer matters, so the player tracks two
+    countdowns with different urgencies. Cognitive load is split exactly
+    where it should be concentrated.
+
+  THE TIDE ADDS A THIRD CELL STATE
+    The grid has two states: neutral and owned. Water adds shallow/deep/land
+    -- a LEGIBILITY TAX on the most-read surface in the game, at the exact
+    moment the player is trying to parse territory edges under pressure.
+
+  IT OCCUPIES NO NEW GROUND
+    Hexanaut already has endgame + totems + ladder. Paper.io 2 already has
+    smooth control + power-ups + map progression. Territorial.io already has
+    water, ships and an economy. The tide is BEHIND the innovation curve.
+
+  EROSION IS INVISIBLE BOOKKEEPING
+    Players watch the score number, not their own thinning edges. The most
+    novel part of the design is the part they will never consciously notice.
+    A mechanic that cannot be SEEN cannot be STRATEGISED with.
+
+  BOAT-ON-BLUE-WATER IS THE MOST CROWDED VISUAL SPACE IN GAMES
+    Every boat game looks like a boat game. TIDE would fight a thousand prior
+    associations for its single distinctive element.
+
+
+6.2 WEAKNESSES
+--------------------------------------------------------------------------------
+  1. EROSION IS UNAFFORDABLE. Death already erases 100% of your land.
+     There is no headroom beneath a maximum penalty.
+  2. The optimal strategy is "wait for low tide" -- which makes the tide a
+     WAITING ROOM. If turtling on the safe phase is correct, we have built
+     Paper.io with a progress bar.
+  3. TURTLING, THE GENRE'S DOMINANT STRATEGY, IS OUTLAWED. TIDE removes the
+     behaviour players actually like.
+  4. A GLOBAL CLOCK PHASE-ALIGNS EVERY PLAYER, converting emergent outcomes
+     into scheduled ones. This is an ANTI-EMERGENCE MACHINE, and emergence
+     is the entire value of .io.
+  5. GREED BECOMES SCHEDULING, NOT STRATEGY. "I expanded at the right times"
+     is not a story. "I cut off the guy who was winning" is.
+  6. ZERO QUOTABILITY. "Paper.io but with tides" is a description, not a hook.
+  7. The skill expression is MOTOR, not decision -- the least socially
+     interesting kind, and the least visible to a spectator.
+
+
+6.3 CONFUSING MECHANICS
+--------------------------------------------------------------------------------
+  Water level      A continuous value on every cell -- the hardest possible
+                   thing to read at a glance.
+  Erosion          Passive, delayed, non-local. Players cannot predict it
+                   precisely, so it reads as RANDOM.
+  Current field    A second, invisible velocity layer fighting the grid -- the
+                   #1 way to make water feel like syrup.
+  Surge multiplier A scoring rule with no spatial meaning.
+  Reef flats       Change passability AND area availability AND speed AND
+                   risk, all at once.
+
+  Five taught concepts before the first input. Paper.io needs one:
+  "don't hit yourself."
+
+
+6.4 RETENTION RISKS
+--------------------------------------------------------------------------------
+  - Erosion produces a NUMBER GOING DOWN. Loss aversion is roughly 2x the
+    weight of equivalent gain. A visibly shrinking score is the fastest way
+    to lose a browser audience.
+  - Death becomes DOUBLY expensive (total loss + passive decay), producing
+    frustration that a 2-second respawn cannot process.
+  - The global rhythm makes every round feel the same. Kills long-term
+    variety.
+  - SESSION RISK: a tide cycle that punishes greed TEACHES PLAYERS TO BE
+    CAREFUL, and careful players leave a game whose appeal is nerve.
+
+
+6.5 VISUAL IDENTITY RISKS
+--------------------------------------------------------------------------------
+  - Water is ATMOSPHERE, not identity. Nobody remembers a game by its weather.
+  - BLUE ON BLUE. A blue boat on blue water is the lowest-contrast pairing
+    available and the most common in the genre.
+  - NO SILHOUETTE. A tide cycle produces no shape a player can recognise.
+  - BOAT SPRITES are the most saturated corner of mobile app art. We would be
+    indistinguishable from 2004 Flash boat games.
+  - "TIDE" IS A GENERIC WORD -- no owned meaning, no logo, no quotable phrase.
+
+
+6.6 WHAT SURVIVES FROM THE ORIGINAL PREMISE
+--------------------------------------------------------------------------------
+  ONE THING IS GENUINELY GOOD, AND IT IS NOT THE CYCLE:
+
+  >>> DEPTH-BASED PASSABILITY <<<
+  Shallow reef flats are impassable sandbanks; deep channels are always
+  open. This changes WHERE you can go, not WHEN you must. It adds route
+  variety, produces a designed readable archipelago, never synchronises
+  players, never passively removes land, costs ONE ARRAY, and needs no
+  explanation.
+
+  That is the mechanic worth building. The cycle is not.
+
+
+================================================================================
+SECTION 7 -- TEN ALTERNATIVE CONCEPTS
+================================================================================
+
+1. TIDE (REVISED) -- BATHYMETRY                          [ RECOMMENDED ]
+   Core mechanic : A designed archipelago. Shallow flats are impassable
+                   sand; deep channels are open water. You cannot enclose
+                   across a sandbank, so THE SHAPE OF THE SEABED DICTATES
+                   EVERY ROUTE.
+   Resource      : Navigable water -- effectively, time-to-bank.
+   Risk          : Routing. Long open crossings and chokepoints between
+                   rivals.
+   Reward        : Contiguous, defensible, expandable area.
+   Memorable     : THE MAP IS THE CHARACTER. Instantly readable island
+                   silhouettes. Every round a different archipelago.
+                   Thumbnail-recognisable. Nobody in the set has this.
+   Viral         : HIGH -- a weird, beautiful map is the thing people shoot.
+
+2. FORGE -- THE COOLING LAND
+   Core mechanic : Claimed territory is white-hot and cools. Cold land
+                   returns to neutral. You re-heat it by sailing over it.
+   Resource      : Heat (regenerates only while moving).
+   Risk          : A maintenance tax. Movement spent defending is movement
+                   not spent expanding.
+   Reward        : Held area, plus a heat bonus on freshly-banked land.
+   Memorable     : Your land GLOWS AND FADES, and you can see a rival's
+                   territory going grey from across the map. Best repair of
+                   TIDE's "theft feels bad" problem -- the loss is always
+                   traceable to a choice you made.
+
+3. WILDFIRE -- YOUR LAND BURNS
+   Core mechanic : Territory ignites on capture and burns down on a timer.
+                   You must loop and re-claim before it burns out.
+   Resource      : Fuel.
+   Risk          : You can never camp. Every second not expanding is land
+                   converting to neutral behind you.
+   Reward        : Land banked before ignition.
+   Memorable     : FIRE. Orange on black at any zoom on any phone. Every
+                   player's screen tells a different story.
+   Viral         : VERY HIGH. Ages 8-18: excellent. Tone risk: HIGH.
+
+4. BLIGHT -- CONTAGION
+   Core mechanic : Enclosed area becomes infected and spreads on its own
+                   into neutral and enemy land.
+   Resource      : Frontier length (contact edge).
+   Risk          : Perimeter collapse -- a spreading territory has a frontier
+                   you cannot patrol.
+   Reward        : Area gained without spending exposure.
+   Memorable     : A CONTAMINATION FRONT SWEEPING A CLEAN MAP. Offense-first,
+                   which fixes Paper.io's passivity.
+
+5. LATTICE -- CONNECTIVITY
+   Core mechanic : Territory scores ONLY if it is a single connected region.
+                   Split it and the smaller piece zeroes.
+   Resource      : Graph integrity.
+   Risk          : Self-fragmentation. Expanding can REDUCE your score.
+   Reward        : Connected, defensible area.
+   Memorable     : WIREFRAMES -- circuits, mycelium, neural nets. Nobody
+                   else in .io produces this silhouette. Highest skill
+                   ceiling in the list.
+
+6. TESSERA -- SHAPE SCORES, AREA DOESN'T
+   Core mechanic : Territory fills in as usual, but SCORE ONLY COUNTS
+                   COMPLETED PATTERNS -- dominoes, corners, rings.
+   Resource      : Pattern potential in the empty space around you.
+   Risk          : Greed is punished. The biggest available loop is the
+                   WRONG loop.
+   Reward        : Completed figures, worth far more per cell than raw area.
+   Memorable     : Players deliberately build RECOGNISABLE SHAPES, which
+                   produces extraordinary screenshots and a leaderboard of
+                   visible intent.
+   Ages 8-18     : EXCELLENT. Viral: VERY HIGH.
+
+7. QUARRY -- THE SCAR
+   Core mechanic : Enclosed ground is PERMANENTLY EXCAVATED. The hole is
+                   impassable and never returns.
+   Resource      : Neutral map -- finite, and you are spending it.
+   Risk          : Attrition and snowball. Hoarding map is hoarding your own
+                   future options.
+   Reward        : A map progressively denied to your enemies. Aggression
+                   becomes PROVABLE.
+   Memorable     : THE ARENA BECOMES A RECORD OF THE MATCH -- a cratered
+                   battlefield where you can see where the fight happened.
+                   No .io game has a scar.
+
+8. SHADOW -- THE LANTERN
+   Core mechanic : A roaming light crosses the arena. Ground it touches
+                   cannot be claimed. Close a loop in darkness and it's
+                   yours.
+   Resource      : Safe unlit ground.
+   Risk          : A VISIBLE HUNTER WITH A POSITION. You can see it coming
+                   and probably cannot outrun it.
+   Reward        : Shadow area.
+   Memorable     : Every screenshot has a CHARACTER in it. Converts anonymous
+                   pressure into a specific enemy you can point at -- the
+                   cleanest fix for the blame problem.
+
+9. ATOLL -- YOU BUILD AN ISLAND
+   Core mechanic : No enclosure. You extrude solid land outward from a seed.
+                   The map is water; land is the only claim.
+   Resource      : Mass. Every unit spent growing is a unit not spent on
+                   coastline.
+   Risk          : The moat trade-off. Your island's border is your health
+                   bar.
+   Reward        : Island size.
+   Memorable     : ISLANDS ARE THE MOST READABLE TERRITORY SILHOUETTE IN
+                   EXISTENCE -- any zoom, any thumbnail.
+
+10. ORBIT -- GRAVITY WELLS
+    Core mechanic : Territory is a well. You drop mass to seed more wells;
+                    nearby wells destabilise each other's fields.
+    Resource      : Mass.
+    Risk          : Proximity -- wells warp each other and can shatter a
+                    field.
+    Reward        : Captured radius.
+    Memorable     : A SWIRLING ACCRETION DISK. No .io game looks like this.
+                    Highest visual ceiling, lowest fit for a grid and for a
+                    3-minute round.
+
+
+7.1 RANKING AGAINST THE FULL BRIEF
+--------------------------------------------------------------------------------
+  CONCEPT        LEGIBILITY  1-2CTRL  SESSION  IDENTITY  VIRAL  BUILD COST
+  --------------  ----------  -------  -------  --------  -----  ----------
+  TIDE (revised)     3          3         3         3        3        2
+  TESSERA            2          3         3         3        3        3
+  QUARRY             3          3         3         3        3        2
+  BLIGHT             2          3         2         3        3        1
+  FORGE              2          3         3         2        2        2
+  WILDFIRE           3          3         2         3        3        2
+  ATOLL              3          3         3         3        2        3
+  SHADOW             2          3         2         2        3        1
+  LATTICE            1          3         2         3        2        2
+  ORBIT              1          3         1         3        2        1
+
+  (3 = clears the bar, 2 = adequate, 1 = fails it)
+
+  TIDE (REVISED) IS THE ONLY CONCEPT THAT SCORES WELL ON EVERY AXIS
+  SIMULTANEOUSLY. That is why it stays.
+
+
+================================================================================
+SECTION 8 -- PLAYER JOURNEY
+================================================================================
+
+8.1 SCREEN MAP
+--------------------------------------------------------------------------------
+  #  SCREEN                PURPOSE                  IN CLONE?   PRIORITY
+  -  --------------------  -----------------------  ----------  --------
+  1  Boot / load           assets + connectivity    partial     P0
+  2  Home                  name, play, settings     yes (2 dead buttons) P0
+  3  Match found / countdown  3s "Spawning..."      MISSING     P0
+  4  In-match HUD          %, kills, rank, map info partial     P0
+  5  Death                 cause + killer + respawn MISSING     P0
+  6  Results               standings + your stats   MISSING ENTIRELY  P0
+  7  Progression           unlocks, mastery, rank   MISSING ENTIRELY  P1
+  8  Leaderboard           persistent ranks         MISSING     P1
+  9  Settings              quality, colours, audio  1 gear + alert()  P1
+ 10  How to play           teach in 15s by design   MISSING     P0
+ 11  Pause                 especially on mobile     MISSING     P1
+
+
+8.2 NAVIGATION PATHS
+--------------------------------------------------------------------------------
+  Boot --> (connectivity fail) --> Retry --> Home
+   |
+   +- Play ------------> Countdown(3s) --> Match
+   +- Spectate ---------> Countdown(3s) --> Spectate (no death state)
+   +- Settings ---------> Home
+   `- Progression ------> Home
+
+  Match -- death --> Death screen --+- Respawn (space/tap, <=1.5s) --> Match
+                                        `- Home
+
+  Match -- round ends (King timer / 3:00) --> Results --+- Replay --> Countdown
+                                                             `- Home
+
+
+8.3 RULES THAT MUST HOLD
+--------------------------------------------------------------------------------
+  - MAXIMUM TWO TAPS from death back to moving.
+    The clone requires finding a button. Unacceptable.
+  - RESULTS IS MANDATORY, NOT OPTIONAL.
+    It is the only place progression is legible.
+  - NEVER strand a player on a loading screen. Every transition under 2s.
+
+
+8.4 MISSING SCREENS, RANKED BY VALUE
+--------------------------------------------------------------------------------
+  1. RESULTS SCREEN. Highest value in the entire project. The only beat the
+     genre has, and the clone has none. Progression, mastery and "play again"
+     all live here.
+  2. DESIGNED DEATH SCREEN. Must name the killer and highlight the trail
+     that killed you. The clone's server cannot even do this today.
+  3. COUNTDOWN / MATCH FOUND. 3 seconds of "get ready" prevents the cheap
+     first death that decides whether a new player returns.
+  4. HOW TO PLAY. Diegetic, 15 seconds, shown once. The % counter teaches,
+     but 5% of players need the sentence too.
+  5. PROGRESSION / COLLECTION. Cosmetics, mastery, rank.
+  6. PAUSE. Mandatory on mobile.
+
+
+================================================================================
+SECTION 9 -- PROGRESSION
+================================================================================
+
+  DESIGN CONSTRAINT:
+  NOTHING OUTSIDE A MATCH MAY MAKE A PLAYER FASTER, LARGER, HARDER TO KILL,
+  OR BETTER AT CAPTURING. EVER.
+  All out-of-match progression is cosmetic, informational, or social.
+
+9.1 WHY THE PLAYER RETURNS
+--------------------------------------------------------------------------------
+  AFTER   HOOK                              WHAT THEY ARE CHECKING
+  ------  ---------------------------------  ----------------------------
+  1       The % number. Instant, continuous, "Am I good at this?"
+          0.4s latency.
+  5       A named rival and a personal       "Can I beat that specific
+          best.                             number?"
+  20      A VISIBLE MASTERY TREND: biggest  "Am I actually IMPROVING?"
+          single capture, survival time,
+          peak %, and how efficiently you
+          convert exposure into area.
+  100     A rank tier, a signature          "Am I among the best?"
+          cosmetic, mastery challenges.
+
+  THE CRITICAL INSIGHT:
+  In the clone, MASTERY IS INVISIBLE. You cannot see that you improved, so
+  there is no twenty-match retention. Hexanaut solved it with a nine-tier
+  ladder. Paper.io 2 with stat challenges. We solve it more cheaply and more
+  honestly, with A PER-MATCH POST-GAME CARD showing conversion efficiency --
+  a number that only rises as you genuinely get better.
+
+
+9.2 COSMETIC PROGRESSION
+--------------------------------------------------------------------------------
+  - Hull colour and pattern, unlocked by play, never by purchase pressure.
+  - Sail / wake style.
+  - Territory fill texture -- cheapest possible identity win, renders from a
+    texture atlas.
+  - SIGNATURE TRAILS, earned by mastery milestones, not by time.
+
+
+9.3 SKILL PROGRESSION (informational only)
+--------------------------------------------------------------------------------
+  - Rank tiers: earned, visible, seasonal reset, "best ever" record kept.
+  - Mastery challenges: "bank 40 cells in one loop", "survive 90s at 20%
+    share", "win from last place". THESE TRACK AND CELEBRATE SKILL. THEY DO
+    NOT GRANT POWER.
+  - Ghost replay of your best run -- the strongest possible mastery teacher,
+    and a cheap technical win once netcode is solid.
+
+
+9.4 LONG-TERM GOALS
+--------------------------------------------------------------------------------
+  - WEEKLY RULE SETS -- free, rotating, zero new content required.
+    Hexanaut proves this works.
+  - COLLECTION -- rare map shapes, unusual captures, "first to reach 60%".
+  - ARCHIPELAGO FRAGMENTS -- cosmetic map pieces, earned not bought.
+  - SOCIAL LAYER -- friends list and shared leaderboards. No obligations.
+    No clans.
+
+
+9.5 EXPLICITLY REJECTED
+--------------------------------------------------------------------------------
+  Pay-to-win. Pay-to-faster. Energy timers. Loot boxes. Any upgrade tree that
+  touches movement. A battle pass with a FOMO window. Any stat that improves
+  capture efficiency.
+
+
+================================================================================
+SECTION 10 -- RECOMMENDATIONS
+================================================================================
+
+  R1  DELETE THE TIDE CYCLE. KEEP THE WATER AND THE NAME.
+      Replace with STATIC BATHYMETRY: shallow flats impassable, deep channels
+      open, designed archipelago.
+      (Highest confidence statement in this document.)
+
+  R2  ADD ONE PLAYER-PAID HOLDING COST, NOT A GLOBAL ONE.
+      Freshly captured territory is hot and cools to neutral unless
+      revisited. Converts a permanent asset into a maintained one, adds a
+      genuine second decision, is fully traceable to the player's own
+      choices, and never removes land while they are dead.
+
+  R3  BUILD THE KING ENDGAME.
+      Reach a share threshold -> become the leader -> a visible countdown
+      begins -> survive it to win. One threshold, one timer, zero
+      synchronisation. Hexanaut proves it works and it fixes "the game runs
+      out".
+
+  R4  THREE-MINUTE ROUNDS WITH A MANDATORY RESULTS SCREEN.
+      Highest player-minute value in the entire project. Costs almost
+      nothing.
+
+  R5  INSTANT RESPAWN IN ONE TAP. Max two taps from death to moving.
+
+  R6  KILL ATTRIBUTION. Name the killer, highlight the trail that killed
+      you. The clone cannot do this at all. Most satisfying missing feedback
+      in the genre.
+
+  R7  MAP OBJECTIVES, NOT PICKUPS.
+      Adopt Hexanaut's insight: place two or three things ON THE MAP that
+      require a route decision to reach. This is how you add strategic depth
+      without adding a clock or a second control.
+
+  R8  PRESERVE THE SHARED DETERMINISTIC CORE AND 4-DIRECTION INPUT.
+      This is what makes the netcode cheap and the feel crisp. It also means
+      THE SIMULATION MUST BE A PLAIN TYPESCRIPT MODULE WITH NO PHASER
+      DEPENDENCY, using Phaser purely as a renderer.
+
+  R9  FIX MOBILE INPUT AT THE FRAME BOUNDARY.
+      The clone resolves swipes on touchend, so input latency equals swipe
+      duration. One-day fix, larger perceived-quality effect than any art
+      pass.
+
+  R10 PROGRESSION IS INFORMATIONAL AND COSMETIC ONLY.
+      Ship the per-match mastery card in v1. Cheapest retention lever
+      available.
+
+  R11 SHRINK THE WORLD.
+      A 4000x4000 board with a fifth-of-map view leaves new players alone
+      for their first minute. A smaller board puts the SOCIAL LAYER -- the
+      entire point of .io -- in front of them immediately.
+
+
+================================================================================
+SECTION 11 -- FINAL VERDICT
+================================================================================
+
+                              B)  I M P R O V E   T I D E
+
+
+  NOT A.  Tide-cycle TIDE fails on structural grounds. It contradicts the
+  brief's own 2-minute comprehension requirement. It stacks a passive loss on
+  top of a death penalty that is already total. It deletes the genre's
+  dominant strategy. A global clock converts emergent outcomes into
+  scheduled ones. And it occupies an innovation axis that Paper.io 2 and
+  Hexanaut already took.
+
+  NOT C.  No alternative in Section 7 beats revised TIDE on the full brief.
+  LATTICE has a higher skill ceiling but fails onboarding outright. TESSERA
+  and QUARRY are both excellent and would both be viable -- TESSERA is the
+  strongest fallback. But revised TIDE is the only concept that is
+  simultaneously legible in 3 minutes, controllable with ONE input,
+  identifiable in a thumbnail, buildable in a browser at 60fps on a phone,
+  and genuinely novel against the competitive set.
+
+
+  RECOMMENDED CONCEPT:  TIDE -- BATHYMETRY
+  ------------------------------------------------------------------------
+    A boat on a designed seabed. Shallow reef flats are impassable sand;
+    deep channels are open water. You cannot enclose across a sandbank, so
+    THE SHAPE OF THE MAP DECIDES EVERY ROUTE. Capture land, reach the share
+    threshold, become the leader, and survive the countdown while everyone
+    hunts you.
+
+
+  EVIDENCE
+  --------
+   1. Source-verified: the death penalty is already 100%.
+      No headroom for erosion.                     (Sections 1.4, 2.6)
+   2. Source-verified: zero-maintenance territory is load-bearing. Decay
+      changes the resource rather than deepening it.(Section 2.2)
+   3. Source-verified: no round, no end, no results, no progression.
+      The largest gaps, and all of them cheap.     (Sections 1.11, 8.4)
+   4. Competitive: both direct competitors solved depth via endgame and map
+      objects, NOT environmental cycles.          (Section 3.2)
+   5. Competitive: no game in the set has a designed map as its primary
+      strategic object. That is the white space.  (Section 3.3)
+   6. Competitive: Hexanaut's King phase is a proven, cheap fix for the
+      exact "game runs out" failure TIDE ignores.  (Section 3.1)
+   7. Psychological: the tide inserts an uncontrollable link between effort
+      and result, weakening competence.           (Section 4)
+   8. Requirement: the tide needs five taught concepts before first input,
+      against a stated 2-minute target.            (Section 6.3)
+
+
+  CONFIDENCE
+  ----------
+    74%   Revised TIDE (bathymetry + King endgame) deserves a greenlight
+    19%   Tide-cycle TIDE deserved a greenlight
+     7%   One of the ten alternatives is stronger
+
+
+  WHAT WOULD CHANGE MY MIND
+  -------------------------
+  If playtesting shows the archipelago reads as ARBITRARY rather than
+  DESIGNED -- if players cannot name a route in the first thirty seconds --
+  then the map carries no strategic weight and R1 collapses.
+  In that case the fallback is TESSERA: more readable, cheaper, more
+  shareable, at the cost of a lower skill ceiling.
+
+
+  WHAT I AM LEAST SURE ABOUT
+  --------------------------
+  That 3-minute rounds are better than open-ended play for this audience.
+  Hexanaut's King phase can degrade into a passive siege where the leader
+  just waits out a timer.
+  The King phase is the highest-leverage AND highest-risk element in this
+  plan. It must be playtested before anything else in Section 10 is built.
+
+
+================================================================================
+DECISIONS NEEDED BEFORE ANY PHASE 1 WORK
+================================================================================
+
+  (a) Approve BATHYMETRY as the core mechanic, or name one of the ten
+      alternatives in Section 7.
+
+  (b) Decide whether to keep Phaser 3 as the RENDERER, given R8's
+      constraint that the simulation must be engine-independent. This is
+      not a detail -- it is the core architecture.
+
+  (c) Approve or reject the KING ENDGAME (R3) separately, since it is the
+      single highest-leverage and highest-risk element.
+
+================================================================================
+                              END OF REVIEW
+================================================================================

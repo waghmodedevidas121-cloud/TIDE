@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE Phase 1 — Prototype Implementation Plan</title>
+<style>
+  :root{--bg:#0b1622;--panel:#101f2e;--panel2:#0c1826;--line:#1c3044;--ink:#e8f1f8;
+        --muted:#8ba3b8;--dim:#5f7688;--cyan:#4fc3f7;--cdim:#2a7fa8;
+        --green:#5ddc9a;--amber:#ffb547;--red:#f4515e;--violet:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,system-ui,sans-serif;line-height:1.65}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 24px 100px}
+  header{padding:60px 0 40px;border-bottom:1px solid var(--line);margin-bottom:40px}
+  .kicker{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:16px}
+  h1{font-size:40px;font-weight:200;letter-spacing:3px;margin-bottom:12px}
+  .sub{color:var(--muted);font-size:16px;max-width:760px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .chip{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;padding:5px 11px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+  .chip.on{border-color:var(--cdim);color:var(--cyan)}
+  h2{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin:58px 0 18px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+  h2 .n{color:var(--dim);font-weight:400}
+  h3{font-size:16px;font-weight:600;margin:28px 0 8px}
+  h4{font-size:13.5px;font-weight:600;margin:20px 0 6px;color:var(--cyan)}
+  p{margin-bottom:13px;color:#c9d8e4}p strong,li strong{color:#fff}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  ul{margin:0 0 15px 20px}li{margin-bottom:8px;color:#c9d8e4}
+  ol{margin:0 0 15px 22px}ol li{margin-bottom:8px;color:#c9d8e4}
+  code{font-family:Consolas,monospace;font-size:13px;background:var(--panel2);padding:2px 5px;border-radius:3px;color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th{text-align:left;padding:11px 13px;background:var(--panel2);font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}td strong{color:#fff}
+  .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px 24px;margin:20px 0}
+  .flag{border-radius:8px;padding:18px 22px;margin:20px 0;border:1px solid}
+  .flag .lbl{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;font-weight:700;margin-bottom:7px;display:block}
+  .flag p:last-child,.flag ul:last-child,.flag ol:last-child{margin-bottom:0}
+  .dec{border-color:#1d4a5e;background:#0e2029}.dec .lbl{color:var(--cyan)}
+  .ok{border-color:#245240;background:#0e1f18}.ok .lbl{color:var(--green)}
+  .warn{border-color:#5a4520;background:#1d1810}.warn .lbl{color:var(--amber)}
+  .risk{border-color:#5a2a2f;background:#1c1116}.risk .lbl{color:var(--red)}
+  pre{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:16px 18px;overflow-x:auto;
+      font-family:Consolas,monospace;font-size:12px;color:#9fc4d8;line-height:1.55;margin:14px 0}
+  /* milestone cards */
+  .ms{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cdim);border-radius:0 8px 8px 0;
+      padding:20px 24px;margin:16px 0}
+  .ms.gate{border-left-color:var(--amber)}
+  .ms.done{border-left-color:var(--green)}
+  .ms .hd{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  .ms .id{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+  .ms .ttl{font-size:18px;font-weight:600}
+  .ms .br{font-family:Consolas,monospace;font-size:12px;color:var(--violet)}
+  .ms dl{margin:12px 0 0;font-size:14px}
+  .ms dt{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-top:12px}
+  .ms dd{margin:4px 0 0;color:#c2d3e0}
+  .ms .exit{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:13.5px}
+  .ms .exit b{color:var(--green);font-size:10px;letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:4px}
+  figure{margin:24px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 16px 14px}
+  figcaption{font-size:13px;color:var(--muted);margin-top:11px;text-align:center}
+  svg{display:block;width:100%;height:auto}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}h1{font-size:28px}}
+  footer{margin-top:70px;padding-top:26px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <div class="kicker">Phase 1 · Document 3 of 3</div>
+  <h1>Implementation Plan</h1>
+  <p class="sub">Nine milestones, each independently verifiable, each on its own branch, each ending in a thing you can play. The last milestone is not a build — it is a decision.</p>
+  <div class="meta">
+    <span class="chip on">Estimated 8–11 working days</span>
+    <span class="chip">9 milestones</span>
+    <span class="chip">GitHub-first</span>
+    <span class="chip">Ends in a PASS / FAIL gate</span>
+  </div>
+</header>
+
+<h2><span class="n">00</span> The sequencing principle</h2>
+<div class="flag dec">
+  <span class="lbl">Why the order is what it is</span>
+  <p>Three rules decide every sequence below:</p>
+  <ol style="margin-left:20px">
+    <li><strong>Nothing is unplayable for longer than one milestone.</strong> After M3 the player can move and capture. We would rather have a crude loop on day three than a perfect loop on day eleven.</li>
+    <li><strong>Terrain comes last, not first.</strong> The enclosure loop is ported from a proven algorithm. We ship it working before adding a single sand cell, so that if the concept fails we know it was the terrain and not the capture code.</li>
+    <li><strong>Bot before polish.</strong> A credible opponent is a success condition. It is also the cheapest possible source of load and corner-case discovery.</li>
+  </ol>
+</div>
+
+<figure>
+<svg viewBox="0 0 900 250" role="img" aria-label="Milestone dependency flow from grid to playtest gate">
+  <defs>
+    <marker id="m1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#4fc3f7"/></marker>
+  </defs>
+  <rect x="14" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="61" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M1</text>
+  <text x="61" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">grid + map</text>
+
+  <rect x="126" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="173" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M2</text>
+  <text x="173" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">boat + input</text>
+
+  <rect x="238" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#4fc3f7"/>
+  <text x="285" y="62" fill="#4fc3f7" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M3</text>
+  <text x="285" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">trail + capture</text>
+
+  <rect x="350" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="397" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M4</text>
+  <text x="397" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">death + respawn</text>
+
+  <rect x="462" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="509" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M5</text>
+  <text x="509" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">render + HUD</text>
+
+  <rect x="574" y="40" width="94" height="52" rx="7" fill="#12212f" stroke="#ffb547" stroke-width="1.6"/>
+  <text x="621" y="62" fill="#ffb547" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M6</text>
+  <text x="621" y="78" fill="#8ba3b8" font-size="9.5" text-anchor="middle" font-family="Segoe UI">TERRAIN</text>
+
+  <rect x="686" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="733" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M7</text>
+  <text x="733" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">bot</text>
+
+  <rect x="798" y="40" width="94" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="845" y="62" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M8</text>
+  <text x="845" y="78" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">mobile</text>
+
+  <line x1="108" y1="66" x2="122" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="220" y1="66" x2="234" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="332" y1="66" x2="346" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="444" y1="66" x2="458" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="556" y1="66" x2="570" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="668" y1="66" x2="682" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+  <line x1="780" y1="66" x2="794" y2="66" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#m1)"/>
+
+  <text x="255" y="26" fill="#5f7688" font-size="10.5" text-anchor="middle" font-family="Segoe UI">TERRAIN-FREE — stock Paper.io loop, proven algorithm</text>
+  <text x="621" y="26" fill="#ffb547" font-size="10.5" text-anchor="middle" font-family="Segoe UI">THE CONCEPT ENTERS HERE</text>
+
+  <path d="M61,96 L61,150 L621,150 L621,120" stroke="#ffb547" stroke-width="1.3" stroke-dasharray="4 4" fill="none"/>
+  <path d="M845,96 L845,176 L255,176 L255,96" stroke="#5ddc9a" stroke-width="1.3" stroke-dasharray="4 4" fill="none"/>
+
+  <rect x="392" y="196" width="118" height="42" rx="7" fill="#1c1116" stroke="#f4515e" stroke-width="1.6"/>
+  <text x="451" y="214" fill="#f4515e" font-size="11.5" text-anchor="middle" font-family="Segoe UI">M9 · GATE</text>
+  <text x="451" y="230" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">PASS or pivot to Forge</text>
+</svg>
+<figcaption>Terrain enters at M6, not M1. If the concept fails we will already know the enclosure loop itself is sound.</figcaption>
+</figure>
+
+<h2><span class="n">01</span> Milestones</h2>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 1</span> <span class="ttl">Grid, map loader, static terrain render</span></div><span class="br">feature/map-loader</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Parse the 48×48 map file into a terrain array. Add a <code>isPassable</code> and <code>speedAt</code> query. Render the whole map once into a Phaser texture and display it. Phaser shell, camera fixed on the full map.</dd>
+    <dt>Verify</dt>
+    <dd>Map renders. Cell (24,18) is deep. Cell (20,20) is sand. <code>speedAt</code> returns 0.5 on any shallow cell.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>The map is on screen and correct at a glance. Someone who has not seen the design doc can name the tan shapes as "land".</div>
+</div>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 2</span> <span class="ttl">Boat movement and buffered input</span></div><span class="br">feature/boat-movement</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Continuous position, integer cell + sub-step offset. Four buffered headings. Turn consumed only on a cell line. Step clamped to the next boundary so slow cells cannot overshoot. Keys, then swipe.</dd>
+    <dt>Verify</dt>
+    <dd>Turns feel crisp. The boat never skips a cell. Reversal attempts are ignored. Touch swipe works.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>Movement feels identical to Paper.io. This is the one thing that must not regress — if it feels wrong here it will feel wrong everywhere.</div>
+</div>
+
+<div class="ms gate">
+  <div class="hd"><div><span class="id">Milestone 3 — first playable</span> <span class="ttl">Trail and area capture</span></div><span class="br">feature/trail-capture</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>RLE trail plus sparse hit-grid. <code>fillTail</code> + <code>floodFill</code> with <strong>no terrain handling yet</strong> — everything passable, so this is stock Paper.io. Territory as <code>Uint8Array</code>. Dirty-cell set.</dd>
+    <dt>Verify</dt>
+    <dd>Leave territory, loop, return, bank the area. Hitting your own trail does nothing yet.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b><strong>A stranger captures territory within 60 seconds of being handed the build, with no instruction.</strong> This is the Paper.io success condition, reproduced as our own baseline before any concept work begins.</div>
+</div>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 4</span> <span class="ttl">Death, respawn, score</span></div><span class="br">feature/death-respawn</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Own-tail death. Border death. Body collision with the <code>area(p)</code> tiebreak and the safe-zone rule. Death clears all owned cells to neutral. 1.0s respawn at the far spawn point. Score = cells ÷ claimable, two decimals.</dd>
+    <dt>Verify</dt>
+    <dd>All four collision outcomes reachable and correct. Territory is erased on death. Score decrements correctly.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>Every death cause is legible and attributable. The player can say why they died, every time.</div>
+</div>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 5</span> <span class="ttl">Rendering pass and HUD</span></div><span class="br">feature/render-hud</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Territory fill at 45% alpha plus boundary outline, dirty-cell redraw. Trails opaque. Boats with white core. HUD: own %, opponent %, kills, both boat colours. Death flash.</dd>
+    <dt>Verify</dt>
+    <dd>Visual priority order holds: trail dominates, boat locates instantly, territory is readable without hiding terrain.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>Simultaneously readable: both boats, both territories, both trails, and three terrain types, at 1920px and at 390px.</div>
+</div>
+
+<div class="ms gate">
+  <div class="hd"><div><span class="id">Milestone 6 — THE CONCEPT</span> <span class="ttl">Bathymetry: speed and sand</span></div><span class="br">feature/bathymetry</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Two changes only. <strong>(a)</strong> Speed multiplier from the terrain layer — deep 1.0×, shallow 0.5×. <strong>(b)</strong> Sand added to the flood-fill boundary set and to the movement collision set. Nothing else changes.</dd>
+    <dt>Verify</dt>
+    <dd>Boat is visibly slower in shallows. Cannot enter sand. <strong>A loop cannot enclose across sand.</strong> The lagoon can be enclosed by driving a perimeter around the mainland — test this explicitly.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>Speed difference is immediately perceptible without being told. The lagoon perimeter loop is confirmed possible. Total new code is under ~150 lines.</div>
+</div>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 7</span> <span class="ttl">The bot</span></div><span class="br">feature/bot</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Three-state policy — expand, hunt, return — running the same core in the same process. Sand term in the raycast at strong negative weight. Rectangle path aborts and recomputes on sand. Seeded RNG, not <code>Math.random</code>.</dd>
+    <dt>Verify</dt>
+    <dd>Bot captures land. Bot never drives into sand. Bot visibly abandons a blocked plan. Bot occasionally dies to the player.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>Bot is <strong>beatable-looking</strong> — visibly fallible, and its mistakes are ones the player could have predicted. A competent player beats it by reading the map.</div>
+</div>
+
+<div class="ms">
+  <div class="hd"><div><span class="id">Milestone 8</span> <span class="ttl">Touch, telemetry, tuning</span></div><span class="br">feature/telemetry-mobile</span></div>
+  <dl>
+    <dt>Build</dt>
+    <dd>Touch controls sampled at the frame boundary. Five counters. All tuning knobs live-editable. DPR capped at 2.</dd>
+    <dt>Verify</dt>
+    <dd>Playable one-handed on a phone. Counters visible. Speed ratio sweepable without a rebuild.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>A full test session can be run on a phone with no visible stutter and no mis-taps.</div>
+</div>
+
+<div class="ms gate">
+  <div class="hd"><div><span class="id">Milestone 9</span> <span class="ttl">The gate — playtest and decide</span></div><span class="br">docs/phase1-verdict</span></div>
+  <dl>
+    <dt>Do</dt>
+    <dd>Run the protocol below. Collect the numbers. Write a verdict document. No new features.</dd>
+  </dl>
+  <div class="exit"><b>Exit criteria</b>A written PASS or FAIL with evidence, and a decision on whether TIDE continues.</div>
+</div>
+
+<h2><span class="n">02</span> Telemetry — five counters, no more</h2>
+<div class="panel">
+  <table style="margin:0">
+    <thead><tr><th>Counter</th><th>What it measures</th><th>Why it exists</th></tr></thead>
+    <tbody>
+      <tr><td><code>timeToFirstCapture</code></td><td>Seconds from spawn to first banked loop</td><td>Baseline comprehension check.</td></tr>
+      <tr><td><code>trailCellsByType</code></td><td>Trail cells laid in deep vs shallow</td><td><strong>The primary terrain metric.</strong> Is the speed rule biting?</td></tr>
+      <tr><td><code>sandBlocked</code></td><td>Times movement was stopped by sand</td><td>Proof the player is testing terrain rather than avoiding it by luck.</td></tr>
+      <tr><td><code>lagoonAttempts</code></td><td>Loops that entered a keyhole</td><td>Whether the prize and the chokepoint are being noticed at all.</td></tr>
+      <tr><td><code>deathsByCause</code></td><td>Tail / border / body / sand</td><td>Confirms deaths stay fair and legible.</td></tr>
+    </tbody>
+  </table>
+</div>
+<p>These are research instrumentation, printed to the browser console. They are <strong>not</strong> a game feature, not networked, not persisted, and must be removable in a single commit after the gate. Five counters is the ceiling — anything more and we start optimising for the metric instead of for the answer.</p>
+
+<h2><span class="n">03</span> Playtest protocol</h2>
+<div class="panel">
+  <h4>Three sessions, one tester, 5 minutes each</h4>
+  <p>One internal tester is enough for a legibility test. It is <em>not</em> enough for a fun test — that is Alpha's job with real players.</p>
+</div>
+<table>
+  <thead><tr><th style="width:8%">When</th><th style="width:30%">Tester is asked to do</th><th>What we are looking for</th></tr></thead>
+  <tbody>
+    <tr><td class="a"><strong>30s</strong></td><td>Stop. Point at the safest route from where you are toward the middle of the map, and say why.</td><td><strong>THE KILL-TEST.</strong> Does they point at deep water, shallow water, or "no idea"? Do they mention the tan shapes at all?</td></tr>
+    <tr><td class="a"><strong>90s</strong></td><td>Play.</td><td>Does the territory form channel-following ribbons, or open-water blobs? Ribbons = pass.</td></tr>
+    <tr><td class="a"><strong>3m</strong></td><td>Keep playing.</td><td>Has anyone entered a keyhole? Has anyone tried to enclose the lagoon and hit the wall?</td></tr>
+    <tr><td class="a"><strong>5m</strong></td><td>Stop. Answer three questions.</td><td>See below.</td></tr>
+  </tbody>
+</table>
+<div class="panel">
+  <h4>The three questions</h4>
+  <ol style="margin-left:20px;margin-bottom:0">
+    <li>"Did the map shape change <em>where</em> you went, or did you just ignore it?"</li>
+    <li>"Was there a moment you chose a longer route on purpose? What made you do that?"</li>
+    <li>"What was the map's dark shape? Describe it." <span class="d">— the silhouette test. If they cannot name it in one breath, visual identity has failed.</span></li>
+  </ol>
+</div>
+<p>Question 3 is the cheapest possible proxy for the visual-identity concern from Phase 0: if a player cannot describe the map's shape unprompted, it will not be identifiable in a thumbnail either.</p>
+
+<h2><span class="n">04</span> The gate — explicit thresholds</h2>
+<div class="flag risk">
+  <span class="lbl">Decided in advance, so it cannot be rationalised later</span>
+  <p>This is the same discipline used to kill the tide. Thresholds are set before the prototype exists, while it is still cheap to be honest about the result.</p>
+</div>
+<table>
+  <thead><tr><th style="width:34%">Metric</th><th style="width:14%">PASS</th><th>FAIL</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Route identification at 30s</strong></td><td class="g">Names deep or shallow water as the deciding factor</td><td class="r">Points at open water, or cannot say</td></tr>
+    <tr><td><strong>Territory shape</strong></td><td class="g">Ribbons following channels</td><td class="r">Blobs in open water</td></tr>
+    <tr><td><strong>Deep-vs-shallow trail split</strong></td><td class="g">Both &gt; 20%</td><td class="r">Shallow &lt; 10% — the speed rule is inert</td></tr>
+    <tr><td><strong>Silhouette recall (Q3)</strong></td><td class="g">Describes a shape in one breath</td><td class="r">"It's just water"</td></tr>
+    <tr><td><strong>Keyhole noticed by 3 min</strong></td><td class="g">Yes, or attempted the lagoon</td><td class="d">Not required to pass</td></tr>
+    <tr><td><strong>Deaths attributable</strong></td><td class="g">Tester names the cause every time</td><td class="r">Any "I don't know what happened"</td></tr>
+  </tbody>
+</table>
+<div class="flag warn">
+  <span class="lbl">Two outcomes that are not passes, whatever the numbers say</span>
+  <ol style="margin-left:20px">
+    <li><strong>The map reads as decorative.</strong> The tester describes it accurately but says it did not matter. That means the terrain is legible but strategically irrelevant — and legibility was never the goal.</li>
+    <li><strong>The tester plays the lagoon puzzle and nothing else.</strong> Finding one hard puzzle and grinding it is not evidence that terrain creates decisions. Watch for tunnel vision in the telemetry.</li>
+  </ol>
+</div>
+
+<div class="flag dec">
+  <span class="lbl">If it FAILS</span>
+  <p><strong>Pivot to Forge.</strong> Terrain-constrained routing does not produce routing decisions → the map is decoration → remove the terrain concept entirely and build <em>Forge</em> (cooling territory, a player-paid holding cost), which attacks the same retention problem through the economy instead of the layout. That is the fallback already identified in the concept ranking.</p>
+</div>
+
+<h2><span class="n">05</span> Git workflow</h2>
+<pre>main        stable only, branch-protected, never pushed to directly
+development integration branch
+feature/*   one branch per milestone
+
+  git switch development && git pull
+  git switch -c feature/boat-movement
+  ... work, commit per logical step ...
+  git push -u origin feature/boat-movement
+  open PR -> CI -> review -> merge into development
+  ... playable build tagged on development ...
+  # development -> main only when a milestone gate passes</pre>
+<div class="panel">
+  <h4>Commit convention</h4>
+  <pre>feat: add buffered turn handling at cell boundaries
+feat: implement flood-fill capture with sand boundary
+feat: extend bot raycast with terrain term
+fix: clamp sub-step movement at cell lines to avoid overshoot
+fix: lagoon perimeter loop captured no cells
+refactor: extract passability query from terrain array
+perf: redraw only dirty territory cells
+chore: remove post-gate telemetry counters</pre>
+  <p style="margin-bottom:0">Rejected: <code>update</code>, <code>changes</code>, <code>fixes</code>, <code>work</code>, <code>wip</code>.</p>
+</div>
+<p><strong>CI on every PR:</strong> typecheck, build, and a headless simulation smoke test — 2,000 ticks of the core with scripted input, asserting no NaN and no out-of-bounds write. The core is engine-independent precisely so this test is cheap to write, and it is the earliest warning that determinism has drifted.</p>
+
+<h2><span class="n">06</span> Risk register</h2>
+<table>
+  <thead><tr><th style="width:32%">Risk</th><th style="width:11%">Severity</th><th>Response</th></tr></thead>
+  <tbody>
+    <tr><td>Terrain proves strategically irrelevant</td><td class="r">FATAL</td><td>This is the test. Pivot to Forge per the gate.</td></tr>
+    <tr><td>Speed ratio wrong; shallow never used</td><td class="a">HIGH</td><td>Live-tunable in M8. One session to sweep, not three.</td></tr>
+    <tr><td>Movement feels different from Paper.io because of the sub-step clamp</td><td class="a">HIGH</td><td>Clamp must be invisible. Test in M2 against the real thing before adding anything else.</td></tr>
+    <tr><td>Bot is either trivial or infuriating</td><td class="a">HIGH</td><td>Three-state policy already has a known weakness. Tune the sand weight and the expand threshold only — no new behaviours in Phase 1.</td></tr>
+    <tr><td>One tester is not representative</td><td class="a">HIGH</td><td>Accepted and stated. This is a legibility test, not a fun test. Real-player validation is an Alpha gate.</td></tr>
+    <tr><td>Scope creep back toward the tide</td><td class="d">MED</td><td>Any branch touching tide, water level, erosion, current, or multiplier does not merge. There is a standing constraint for this.</td></tr>
+    <tr><td>Mobile performance surprises</td><td class="d">MED</td><td>Full-map camera and static terrain make this cheap. Verified at M8.</td></tr>
+    <tr><td>Determinism drifts, breaking the smoke test</td><td class="d">LOW</td><td>Caught by CI at the moment it happens. This is the whole point of the engine-independent rule.</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">07</span> Effort estimate</h2>
+<table>
+  <thead><tr><th>Milestone</th><th style="width:14%">Days</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>M1 · grid, map, terrain render</td><td>0.5</td><td>Mostly data entry</td></tr>
+    <tr><td>M2 · movement and input</td><td>1.5</td><td><strong>Highest technical risk in Phase 1.</strong> The sub-step clamp is fiddly</td></tr>
+    <tr><td>M3 · trail and capture</td><td>1.5</td><td>Proven algorithm, but the flood fill is the part most likely to have edge cases</td></tr>
+    <tr><td>M4 · death, respawn, score</td><td>1</td><td>Four collision rules, each individually simple</td></tr>
+    <tr><td>M5 · render and HUD</td><td>1</td><td>Iterative — this is where legibility gets tuned</td></tr>
+    <tr><td>M6 · bathymetry</td><td>0.5</td><td>The concept itself is ~150 lines. Cheap if the port was right</td></tr>
+    <tr><td>M7 · bot</td><td>1.5</td><td>Port plus terrain term</td></tr>
+    <tr><td>M8 · touch, telemetry, tuning</td><td>1</td><td></td></tr>
+    <tr><td>M9 · playtest and verdict</td><td>1</td><td>Three sessions plus writing it up</td></tr>
+    <tr><td><strong>Total</strong></td><td><strong>8–11</strong></td><td>Plus contingency for the flood fill</td></tr>
+  </tbody>
+</table>
+<div class="flag dec">
+  <span class="lbl">The most valuable thing this budget buys</span>
+  <p>It buys a <strong>disproven or proven answer in eight days</strong> to a question we cannot currently answer by argument. Every hour spent on a tenth concept is an hour not spent finding out whether the first one works. That is the entire argument for stopping design and building this.</p>
+</div>
+
+<footer>
+  <b>TIDE Phase 1 — Implementation Plan.</b> Document 3 of 3. No code written.
+  Companion documents: <b>Prototype Technical Design</b>, <b>Prototype Map Design</b>.
+</footer>
+
+</div></body></html>

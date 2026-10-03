@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE Phase 1 — Prototype Map Design</title>
+<style>
+  :root{--bg:#0b1622;--panel:#101f2e;--panel2:#0c1826;--line:#1c3044;--ink:#e8f1f8;
+        --muted:#8ba3b8;--dim:#5f7688;--cyan:#4fc3f7;--cdim:#2a7fa8;
+        --green:#5ddc9a;--amber:#ffb547;--red:#f4515e;--violet:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,system-ui,sans-serif;line-height:1.65}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 24px 100px}
+  header{padding:60px 0 40px;border-bottom:1px solid var(--line);margin-bottom:40px}
+  .kicker{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:16px}
+  h1{font-size:40px;font-weight:200;letter-spacing:3px;margin-bottom:12px}
+  .sub{color:var(--muted);font-size:16px;max-width:760px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .chip{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;padding:5px 11px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+  .chip.on{border-color:var(--cdim);color:var(--cyan)}
+  h2{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin:58px 0 18px;padding-bottom:11px;border-bottom:1px solid var(--line)}
+  h2 .n{color:var(--dim);font-weight:400}
+  h3{font-size:16px;font-weight:600;margin:28px 0 8px}
+  h4{font-size:13.5px;font-weight:600;margin:20px 0 6px;color:var(--cyan)}
+  p{margin-bottom:13px;color:#c9d8e4}p strong,li strong{color:#fff}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  ul{margin:0 0 15px 20px}li{margin-bottom:8px;color:#c9d8e4}
+  code{font-family:Consolas,monospace;font-size:13px;background:var(--panel2);padding:2px 5px;border-radius:3px;color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th{text-align:left;padding:11px 13px;background:var(--panel2);font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}td strong{color:#fff}
+  .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px 24px;margin:20px 0}
+  .flag{border-radius:8px;padding:18px 22px;margin:20px 0;border:1px solid}
+  .flag .lbl{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;font-weight:700;margin-bottom:7px;display:block}
+  .flag p:last-child,.flag ul:last-child{margin-bottom:0}
+  .dec{border-color:#1d4a5e;background:#0e2029}.dec .lbl{color:var(--cyan)}
+  .ok{border-color:#245240;background:#0e1f18}.ok .lbl{color:var(--green)}
+  .warn{border-color:#5a4520;background:#1d1810}.warn .lbl{color:var(--amber)}
+  .risk{border-color:#5a2a2f;background:#1c1116}.risk .lbl{color:var(--red)}
+  figure{margin:24px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 16px 14px}
+  figcaption{font-size:13px;color:var(--muted);margin-top:11px;text-align:center}
+  svg{display:block;width:100%;height:auto}
+  /* the map */
+  .mapbox{background:#060d15;border:1px solid var(--line);border-radius:8px;padding:16px;overflow-x:auto;margin:18px 0}
+  pre.map{font-family:Consolas,'Courier New',monospace;font-size:11px;line-height:1.0;color:#4a6273;
+          margin:0;white-space:pre;letter-spacing:0}
+  pre.map .sand{color:#d9c48a}
+  pre.map .shallow{color:#2e9fd4}
+  pre.map .deep{color:#0d2f4a}
+  .legend{display:flex;flex-wrap:wrap;gap:18px;margin:14px 0 0;font-size:13px}
+  .legend div{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .sw{width:16px;height:16px;border-radius:3px;border:1px solid #2a4256}
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+  .stat .k{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+  .stat .v{font-size:21px;font-weight:600;color:var(--cyan)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}h1{font-size:28px}}
+  footer{margin-top:70px;padding-top:26px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <div class="kicker">Phase 1 · Document 2 of 3</div>
+  <h1>Prototype Map Design</h1>
+  <p class="sub">One handcrafted bathymetry. Not random, not procedural — handcrafted, because the question is whether a <em>designed</em> map produces routing decisions. A random map would confound "terrain matters" with "this layout happens to matter."</p>
+  <div class="meta">
+    <span class="chip on">48 × 48 · 2,304 cells</span>
+    <span class="chip">4-fold symmetric</span>
+    <span class="chip">Handcrafted</span>
+    <span class="chip">5 named features</span>
+  </div>
+</header>
+
+<h2><span class="n">01</span> Design rules</h2>
+<div class="panel">
+  <ol style="margin-left:20px;margin-bottom:0">
+    <li><strong>Every landmass at least 4 cells thick.</strong> So terrain reads as silhouette, not as per-cell detail. This is what makes 8 px/cell legible on a phone.</li>
+    <li><strong>Four-fold symmetry.</strong> No spawn is advantaged, and rotation of the map changes nothing. Without this, a 1v1 comparison is worthless.</li>
+    <li><strong>Two route types must exist between any two points.</strong> One fast and exposed, one slow and safe. If only one route exists, there is no decision and the prototype measures nothing.</li>
+    <li><strong>At least one chokepoint.</strong> Contested ground must be able to be denied, or territory has no strategic value.</li>
+    <li><strong>Sand is never claimable.</strong> The claimable area is fixed at 1,872 cells, so 100% is a real target and the map can never be exhausted.</li>
+    <li><strong>Shallow water always fringes sand.</strong> Never a bare deep edge against sand — the slow margin must be the default approach, or the speed rule never comes into play.</li>
+  </ol>
+</div>
+
+<h2><span class="n">02</span> The five named features</h2>
+<table>
+  <thead><tr><th style="width:16%">Feature</th><th style="width:30%">Shape</th><th>What it is for</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A. The Deep Run</strong></td><td>Open ocean, outer 7-cell ring, entirely deep</td><td>The fast highway. Exposed, high traffic, no cover. The map's answer to "I want to move quickly."</td></tr>
+    <tr><td><strong>B. The Bars</strong></td><td>Four 20×2 sand bars, one per side</td><td>Force a decision on approach: cross the bar and reach the mainland fast, or run the long way around in deep water. First route choice a player meets.</td></tr>
+    <tr><td><strong>C. The Shallows</strong></td><td>3-cell shallow band on the seaward face of every landmass</td><td>The safe margin. Half speed, but it hugs landmass and never crosses open ocean. Rewards route planning over reflex.</td></tr>
+    <tr><td><strong>D. The Mainland</strong></td><td>20×20 sand block, centre of map</td><td>Solid obstacle. Unclaimable, impermeable, and the reason the lagoon is a puzzle.</td></tr>
+    <tr><td><strong>E. The Lagoon &amp; Keyholes</strong></td><td>12×12 deep pool inside the mainland, reached by four 4-cell shallow passages</td><td><strong>The prize and the chokepoint.</strong> 144 cells of prime deep water, unreachable without committing to one of four narrow gaps — and sand blocks the capture, so you must loop around the mainland to close it. The single best test case in the map.</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">03</span> The map</h2>
+<div class="flag dec">
+  <span class="lbl">Read it as three concentric bands</span>
+  <p>Ocean (fast, open) → Bars (obstacle, choice) → Shallows (slow, safe) → Mainland (wall) → Keyholes (choke) → Lagoon (prize). Every decision in this map is one of those six transitions.</p>
+</div>
+
+<div class="mapbox">
+<pre class="map">
+<svg width="0" height="0" style="position:absolute"></svg>
+</pre>
+</div>
+
+<div class="legend">
+  <div><span class="sw" style="background:#0d2f4a"></span> DEEP — passable, 1.00× speed, open</div>
+  <div><span class="sw" style="background:#2e9fd4"></span> SHALLOW — passable, 0.50× speed, safe</div>
+  <div><span class="sw" style="background:#d9c48a"></span> SAND — impassable, unclaimable</div>
+</div>
+
+<h2><span class="n">04</span> Layout, rendered</h2>
+<p>Because the raw 48×48 character grid is hard to read in a browser at small sizes, here is the same map as a rendered image with the five features annotated.</p>
+
+<figure>
+<svg viewBox="0 0 620 660" role="img" aria-label="Rendered map of the 48 by 48 bathymetry with annotated features: deep run, bars, shallows, mainland, and lagoon with keyholes">
+  <!-- band key handled in caption -->
+  <!-- rows 0..47, cell 12px => 576 wide, 576 tall; offset x=20,y=40 -->
+  <g transform="translate(22,44)">
+  <!-- helper bands drawn row by row -->
+  <!-- Row 0-4 : deep -->
+  <rect x="0" y="0" width="576" height="60" fill="#0d2f4a"/>
+  <!-- Row 5 : shallow 11..36 -->
+  <rect x="0" y="60" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="132" y="60" width="312" height="12" fill="#2e9fd4"/>
+  <!-- Row 6 : shallow 10..37 -->
+  <rect x="0" y="72" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="72" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 7 : shallow 9..38 -->
+  <rect x="0" y="84" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="108" y="84" width="360" height="12" fill="#2e9fd4"/>
+  <!-- Row 8-9 : bars -->
+  <rect x="0" y="96" width="576" height="24" fill="#0d2f4a"/>
+  <rect x="144" y="96" width="24" height="24" fill="#2e9fd4"/>
+  <rect x="168" y="96" width="240" height="24" fill="#d9c48a"/>
+  <rect x="408" y="96" width="24" height="24" fill="#2e9fd4"/>
+  <!-- Row 10 : shallow 9..38 -->
+  <rect x="0" y="120" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="108" y="120" width="360" height="12" fill="#2e9fd4"/>
+  <!-- Row 11 : shallow 10..37 -->
+  <rect x="0" y="132" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="132" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 12 : shallow 11..36 -->
+  <rect x="0" y="144" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="132" y="144" width="312" height="12" fill="#2e9fd4"/>
+  <!-- Row 13 : shallow 10..37 -->
+  <rect x="0" y="156" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="156" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 14-17 : bars + mainland w/ north keyhole -->
+  <g>
+    <rect x="0" y="168" width="576" height="48" fill="#0d2f4a"/>
+    <rect x="96" y="168" width="24" height="48" fill="#d9c48a"/>
+    <rect x="120" y="168" width="48" height="48" fill="#2e9fd4"/>
+    <rect x="168" y="168" width="108" height="48" fill="#d9c48a"/>
+    <rect x="276" y="168" width="24" height="48" fill="#2e9fd4"/>
+    <rect x="300" y="168" width="108" height="48" fill="#d9c48a"/>
+    <rect x="408" y="168" width="48" height="48" fill="#2e9fd4"/>
+    <rect x="456" y="168" width="24" height="48" fill="#d9c48a"/>
+  </g>
+  <!-- Row 18-22 : mainland w/ lagoon -->
+  <g>
+    <rect x="0" y="216" width="576" height="60" fill="#0d2f4a"/>
+    <rect x="96" y="216" width="24" height="60" fill="#d9c48a"/>
+    <rect x="120" y="216" width="48" height="60" fill="#2e9fd4"/>
+    <rect x="168" y="216" width="48" height="60" fill="#d9c48a"/>
+    <rect x="216" y="216" width="144" height="60" fill="#0d2f4a"/>
+    <rect x="360" y="216" width="48" height="60" fill="#d9c48a"/>
+    <rect x="408" y="216" width="48" height="60" fill="#2e9fd4"/>
+    <rect x="456" y="216" width="24" height="60" fill="#d9c48a"/>
+  </g>
+  <!-- Row 23-24 : keyholes west/east -->
+  <g>
+    <rect x="0" y="276" width="576" height="24" fill="#0d2f4a"/>
+    <rect x="96" y="276" width="24" height="24" fill="#d9c48a"/>
+    <rect x="120" y="276" width="96" height="24" fill="#2e9fd4"/>
+    <rect x="216" y="276" width="144" height="24" fill="#0d2f4a"/>
+    <rect x="360" y="276" width="96" height="24" fill="#2e9fd4"/>
+    <rect x="456" y="276" width="24" height="24" fill="#d9c48a"/>
+  </g>
+  <!-- Row 25-29 : mainland w/ lagoon -->
+  <g>
+    <rect x="0" y="300" width="576" height="60" fill="#0d2f4a"/>
+    <rect x="96" y="300" width="24" height="60" fill="#d9c48a"/>
+    <rect x="120" y="300" width="48" height="60" fill="#2e9fd4"/>
+    <rect x="168" y="300" width="48" height="60" fill="#d9c48a"/>
+    <rect x="216" y="300" width="144" height="60" fill="#0d2f4a"/>
+    <rect x="360" y="300" width="48" height="60" fill="#d9c48a"/>
+    <rect x="408" y="300" width="48" height="60" fill="#2e9fd4"/>
+    <rect x="456" y="300" width="24" height="60" fill="#d9c48a"/>
+  </g>
+  <!-- Row 30-33 : mainland w/ south keyhole -->
+  <g>
+    <rect x="0" y="360" width="576" height="48" fill="#0d2f4a"/>
+    <rect x="96" y="360" width="24" height="48" fill="#d9c48a"/>
+    <rect x="120" y="360" width="48" height="48" fill="#2e9fd4"/>
+    <rect x="168" y="360" width="108" height="48" fill="#d9c48a"/>
+    <rect x="276" y="360" width="24" height="48" fill="#2e9fd4"/>
+    <rect x="300" y="360" width="108" height="48" fill="#d9c48a"/>
+    <rect x="408" y="360" width="48" height="48" fill="#2e9fd4"/>
+    <rect x="456" y="360" width="24" height="48" fill="#d9c48a"/>
+  </g>
+  <!-- Row 34 : shallow 10..37 -->
+  <rect x="0" y="408" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="408" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 35 : shallow 11..36 -->
+  <rect x="0" y="420" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="132" y="420" width="312" height="12" fill="#2e9fd4"/>
+  <!-- Row 36 : shallow 10..37 -->
+  <rect x="0" y="432" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="432" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 37 : shallow 9..38 -->
+  <rect x="0" y="444" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="108" y="444" width="360" height="12" fill="#2e9fd4"/>
+  <!-- Row 38-39 : bars -->
+  <rect x="0" y="456" width="576" height="24" fill="#0d2f4a"/>
+  <rect x="144" y="456" width="24" height="24" fill="#2e9fd4"/>
+  <rect x="168" y="456" width="240" height="24" fill="#d9c48a"/>
+  <rect x="408" y="456" width="24" height="24" fill="#2e9fd4"/>
+  <!-- Row 40 : shallow 9..38 -->
+  <rect x="0" y="480" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="108" y="480" width="360" height="12" fill="#2e9fd4"/>
+  <!-- Row 41 : shallow 10..37 -->
+  <rect x="0" y="492" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="120" y="492" width="336" height="12" fill="#2e9fd4"/>
+  <!-- Row 42 : shallow 11..36 -->
+  <rect x="0" y="504" width="576" height="12" fill="#0d2f4a"/>
+  <rect x="132" y="504" width="312" height="12" fill="#2e9fd4"/>
+  <!-- Row 43-47 : deep -->
+  <rect x="0" y="516" width="576" height="60" fill="#0d2f4a"/>
+
+  <!-- spawns -->
+  <circle cx="288" cy="26" r="9" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+  <circle cx="288" cy="550" r="9" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+  <text x="306" y="31" fill="#ffffff" font-size="12" font-family="Segoe UI">P1</text>
+  <text x="306" y="555" fill="#ffffff" font-size="12" font-family="Segoe UI">P2</text>
+
+  <!-- annotation leader lines -->
+  <circle cx="60" cy="300" r="4" fill="#4fc3f7"/>
+  <line x1="60" y1="300" x2="20" y2="270" stroke="#4fc3f7" stroke-width="1"/>
+  <text x="14" y="264" fill="#4fc3f7" font-size="11" text-anchor="end" font-family="Segoe UI">A · Deep Run</text>
+
+  <circle cx="288" cy="108" r="4" fill="#4fc3f7"/>
+  <line x1="288" y1="108" x2="430" y2="70" stroke="#4fc3f7" stroke-width="1"/>
+  <text x="436" y="74" fill="#4fc3f7" font-size="11" font-family="Segoe UI">B · The Bars</text>
+
+  <circle cx="144" cy="324" r="4" fill="#4fc3f7"/>
+  <line x1="144" y1="324" x2="60" y2="368" stroke="#4fc3f7" stroke-width="1"/>
+  <text x="54" y="374" fill="#4fc3f7" font-size="11" text-anchor="end" font-family="Segoe UI">C · Shallows</text>
+
+  <circle cx="192" cy="240" r="4" fill="#4fc3f7"/>
+  <line x1="192" y1="240" x2="120" y2="150" stroke="#4fc3f7" stroke-width="1"/>
+  <text x="114" y="146" fill="#4fc3f7" font-size="11" text-anchor="end" font-family="Segoe UI">D · Mainland</text>
+
+  <circle cx="288" cy="288" r="4" fill="#4fc3f7"/>
+  <line x1="288" y1="288" x2="452" y2="200" stroke="#4fc3f7" stroke-width="1"/>
+  <text x="458" y="196" fill="#4fc3f7" font-size="11" font-family="Segoe UI">E · Lagoon</text>
+  <text x="458" y="210" fill="#5f7688" font-size="10" font-family="Segoe UI">144 cells of deep</text>
+
+  <circle cx="288" cy="182" r="4" fill="#ffb547"/>
+  <text x="300" y="186" fill="#ffb547" font-size="10" font-family="Segoe UI">keyhole (4 cells, shallow)</text>
+  </g>
+  <rect x="20" y="42" width="580" height="580" fill="none" stroke="#2a4256" stroke-width="2"/>
+</svg>
+<figcaption>The prototype map at 1 : 1 cell proportions. Both spawns are in open deep water, 44 cells apart, and symmetric under 180° rotation.</figcaption>
+</figure>
+
+<h2><span class="n">05</span> Raw grid format</h2>
+<p>The shipped map is a plain text file, editable without touching code. This is the authoring format and the authoritative layout:</p>
+<pre>; TIDE prototype bathymetry — 48 x 48
+;   .  deep     passable, 1.00x speed
+;   ~  shallow  passable, 0.50x speed
+;   #  sand     impassable, unclaimable, blocks capture
+;
+; Four-fold symmetric. Landmass minimum 4 cells thick.
+; Spawns declared at the bottom.
+
+................................................
+................................................
+................................................
+................................................
+................................................
+...........~~~~~~~~~~~~~~~~~~~~~~~~~~...........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+.........~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.........
+............~~######################~~............
+............~~######################~~............
+.........~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+...........~~~~~~~~~~~~~~~~~~~~~~~~~~...........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~~~~~............~~~~~~~~##........
+........##~~~~~~~~............~~~~~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~####............####~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+........##~~~~#########~~#########~~~~##........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+...........~~~~~~~~~~~~~~~~~~~~~~~~~~...........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+.........~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.........
+............~~######################~~............
+............~~######################~~............
+.........~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.........
+..........~~~~~~~~~~~~~~~~~~~~~~~~~~~~..........
+...........~~~~~~~~~~~~~~~~~~~~~~~~~~...........
+................................................
+................................................
+................................................
+................................................
+................................................
+
+[spawns]
+P1 = 3,24
+P2 = 44,23</pre>
+
+<h2><span class="n">06</span> Composition and why each number matters</h2>
+<div class="statgrid">
+  <div class="stat"><div class="k">Total cells</div><div class="v">2,304</div></div>
+  <div class="stat"><div class="k">Sand (unclaimable)</div><div class="v">432</div></div>
+  <div class="stat"><div class="k">Claimable</div><div class="v">1,872</div></div>
+  <div class="stat"><div class="k">Deep (fast)</div><div class="v">1,356</div></div>
+  <div class="stat"><div class="k">Shallow (slow)</div><div class="v">516</div></div>
+  <div class="stat"><div class="k">Sand share</div><div class="v">18.8%</div></div>
+</div>
+
+<table>
+  <thead><tr><th style="width:30%">Number</th><th style="width:14%">Value</th><th>Reasoning</th></tr></thead>
+  <tbody>
+    <tr><td>Claimable cells</td><td class="g">1,872</td><td>Small enough that a 3-minute test session contains many captures, so many routing decisions. If the map were Paper.io's 10,000, a player would make three captures per session and we would learn nothing.</td></tr>
+    <tr><td>Sand share</td><td>18.8%</td><td>Enough to force real routing, not so much that the map feels like a maze. Above ~30% it becomes a corridor puzzle; below ~10% it stops mattering.</td></tr>
+    <tr><td>Lagoon</td><td class="a">144 cells</td><td>7.7% of the claimable map — roughly a fifth of a winning territory — behind a 4-cell gate. High enough value that players will attempt it, which is the observation we need.</td></tr>
+    <tr><td>Keyhole width</td><td>4 cells</td><td>Wide enough to be findable by a new player, narrow enough that it feels like a commitment. At 2 cells nobody attempts the lagoon; at 6 it stops being a chokepoint.</td></tr>
+    <tr><td>Shallow share</td><td class="g">27.6%</td><td>Enough slow terrain that the speed rule is always relevant, but still a minority so players must actively choose it rather than drift into it.</td></tr>
+    <tr><td>Shallow band width</td><td>3 cells</td><td>Wide enough to hug, narrow enough that hugging costs real time. One cell would be invisible; five would be a second ocean.</td></tr>
+    <tr><td>Deep Run thickness</td><td>5–7 cells</td><td>A genuine open sea where the two players can circle each other without touching land. This is where aggression happens.</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">07</span> Route analysis — the decisions this map produces</h2>
+<table>
+  <thead><tr><th style="width:22%">Journey</th><th style="width:22%">Fast route</th><th style="width:22%">Slow route</th><th>The decision</th></tr></thead>
+  <tbody>
+    <tr><td>Spawn → outer shelf</td><td>Deep Run, around the bar end</td><td>Cross the bar's 2-cell shallows</td><td class="g">Clear trade. The first one a player meets.</td></tr>
+    <tr><td>Shelf → own territory</td><td>Deep Run, exposed</td><td>Hug the shallows at half speed</td><td class="g">Speed vs. exposure. The core Paper.io skill, now terrain-driven.</td></tr>
+    <tr><td>Anywhere → Lagoon</td><td>Direct keyhole approach</td><td>None. There is no alternative.</td><td class="a">A commitment, not a trade. Four identical options.</td></tr>
+    <tr><td>Lagoon → enclose it</td><td>Impossible from inside</td><td>Loop around the whole mainland</td><td class="r">The puzzle. Sand blocks the capture, so closing the loop requires a 40-cell perimeter run.</td></tr>
+  </tbody>
+</table>
+
+<div class="flag ok">
+  <span class="lbl">Row 4 is the most valuable thing in this map</span>
+  <p>Enclosing the lagoon requires driving a loop <em>around the entire mainland</em>, because sand blocks the flood fill and the lagoon has no other exit. That is not a bug in the capture algorithm — it is the most interesting decision the map can produce, and it arrives without a single new rule. It is the primary thing to watch for in playtest: <strong>do players discover it, and how long does it take them?</strong></p>
+</div>
+
+<h2><span class="n">08</span> Failure modes of this map design</h2>
+<table>
+  <thead><tr><th style="width:30%">Risk</th><th style="width:11%">Severity</th><th>What we would see, and the response</th></tr></thead>
+  <tbody>
+    <tr><td>Concentric symmetry makes the map feel repetitive once both players know it</td><td class="a">HIGH</td><td>Expected, and accepted for a prototype. A 1v1 map is learned in about two minutes. Mitigated later by map seeds — the terrain format supports them at no extra cost.</td></tr>
+    <tr><td>Nobody ever attempts the lagoon</td><td class="a">HIGH</td><td>Means the map has no prize and no chokepoint. Response: raise the lagoon to 10% of claimable area, or place an early-spawn landmark. Do not add a UI marker — that would be teaching the test.</td></tr>
+    <tr><td>Players hug shallows everywhere and never use the deep</td><td class="a">HIGH</td><td>Means the speed bonus is not worth the exposure. Response: raise deep speed or lower shallow to 0.4×. This is a tuning failure with a known dial.</td></tr>
+    <tr><td>Sand-blocked movement feels like the boat is broken</td><td class="d">MED</td><td>Only if sand is invisible. Mitigated by making it the only warm colour on screen. If it still reads badly, add a 1-cell impact marker.</td></tr>
+    <tr><td>Unreadable at 8 px/cell on a phone</td><td class="d">MED</td><td>Mitigated by the 4-cell minimum landmass thickness, which is why rule 1 exists. Verified in M7.</td></tr>
+    <tr><td>The map is so safe that nobody dies</td><td class="d">LOW</td><td>Actually the desirable failure. Death comes from your own tail, which is the fair kind.</td></tr>
+    <tr><td>Enclosing the lagoon is impossible, not just hard</td><td class="r">HIGH</td><td>Would be a capture-algorithm bug, not a design outcome. Verified explicitly in M6 before any playtest.</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">09</span> Tuning knobs</h2>
+<div class="panel">
+  <table style="margin:0">
+    <thead><tr><th>Knob</th><th>Default</th><th>Range</th><th>Changes</th></tr></thead>
+    <tbody>
+      <tr><td><code>DEEP_SPEED</code></td><td>4.0 cells/s</td><td>3.0 – 5.0</td><td>The value of exposure</td></tr>
+      <tr><td><code>SHALLOW_MULT</code></td><td>0.50</td><td>0.35 – 0.70</td><td><strong>Primary dial.</strong> Raise the penalty, raise deep-water usage.</td></tr>
+      <tr><td><code>SHALLOW_BAND</code></td><td>3 cells</td><td>2 – 5</td><td>How much safe margin exists</td></tr>
+      <tr><td><code>KEYHOLE_W</code></td><td>4 cells</td><td>2 – 6</td><td>Whether the lagoon is attempted</td></tr>
+      <tr><td><code>LAGOON_SIZE</code></td><td>12 × 12</td><td>8 – 16</td><td>Whether the lagoon is worth it</td></tr>
+      <tr><td><code>BAR_LEN</code></td><td>20 cells</td><td>12 – 28</td><td>How much the approach is contested</td></tr>
+      <tr><td><code>SAND_KILLS</code></td><td>false</td><td>true / false</td><td>Whether sand is an obstacle or a hazard</td></tr>
+      <tr><td><code>GRID</code></td><td>48</td><td>40 – 64</td><td>Session length and capture frequency</td></tr>
+    </tbody>
+  </table>
+</div>
+<p>Everything except <code>GRID</code> and the map file itself is tunable at runtime, so a playtest can sweep values without a rebuild. That matters because the most likely useful discovery from the prototype is <em>the speed ratio is wrong</em> — and we should be able to find the right value in one session rather than three.</p>
+
+<footer>
+  <b>TIDE Phase 1 — Prototype Map Design.</b> Document 2 of 3. No code written.
+  Companion documents: <b>Prototype Technical Design</b>, <b>Implementation Plan</b>.
+</footer>
+
+</div></body></html>
