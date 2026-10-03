@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE — Phase 0 Design Review</title>
+<style>
+  :root{
+    --bg:#0b1622; --panel:#101f2e; --panel2:#0c1826; --line:#1c3044;
+    --ink:#e8f1f8; --muted:#8ba3b8; --dim:#5f7688;
+    --cyan:#4fc3f7; --cyan-dim:#2a7fa8;
+    --green:#5ddc9a; --amber:#ffb547; --red:#f4515e; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:0 24px 100px}
+
+  /* ---------- header ---------- */
+  header{
+    padding:70px 0 44px; border-bottom:1px solid var(--line); margin-bottom:44px;
+  }
+  .kicker{
+    font-size:11px; letter-spacing:4px; text-transform:uppercase;
+    color:var(--cyan); font-weight:600; margin-bottom:18px;
+  }
+  h1{font-size:62px; font-weight:200; letter-spacing:16px; line-height:1; margin-bottom:14px}
+  h1 span{color:var(--cyan)}
+  .sub{color:var(--muted); font-size:17px; max-width:660px}
+  .meta{
+    display:flex; flex-wrap:wrap; gap:10px; margin-top:28px;
+  }
+  .chip{
+    font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:6px 12px; border:1px solid var(--line); border-radius:3px; color:var(--muted);
+  }
+  .chip.live{border-color:var(--cyan-dim); color:var(--cyan)}
+
+  /* ---------- typography ---------- */
+  h2{
+    font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--cyan);
+    font-weight:600; margin:64px 0 20px; padding-bottom:12px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:12px;
+  }
+  h2 .n{color:var(--dim); font-weight:400; letter-spacing:1px}
+  h3{font-size:17px; font-weight:600; margin:32px 0 10px; color:var(--ink)}
+  h4{font-size:14px; font-weight:600; margin:22px 0 6px; color:var(--cyan)}
+  p{margin-bottom:14px; color:#c9d8e4}
+  p strong,li strong{color:#fff;font-weight:600}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  a{color:var(--cyan)}
+  ul{margin:0 0 16px 20px} li{margin-bottom:9px;color:#c9d8e4}
+  code{
+    font-family:Consolas,'SF Mono',monospace; font-size:13px;
+    background:var(--panel2); padding:2px 6px; border-radius:3px; color:var(--cyan);
+  }
+
+  /* ---------- blocks ---------- */
+  .quote{
+    border-left:3px solid var(--cyan); background:var(--panel);
+    padding:22px 26px; margin:24px 0; border-radius:0 6px 6px 0;
+  }
+  .quote p{font-size:17px;color:#dcebf6;margin:0}
+  .panel{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; padding:24px 26px; margin:22px 0;
+  }
+  .panel h3:first-child,.panel h4:first-child{margin-top:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}h1{font-size:40px;letter-spacing:8px}}
+
+  /* ---------- callouts ---------- */
+  .flag{border-radius:8px;padding:20px 24px;margin:22px 0;border:1px solid}
+  .flag .lbl{
+    font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;
+    margin-bottom:8px;display:block;
+  }
+  .flag p:last-child{margin-bottom:0}
+  .kill{border-color:#5a2a2f;background:#1c1116}
+  .kill .lbl{color:var(--red)}
+  .verdict{border-color:#1d4a5e;background:#0e2029}
+  .verdict .lbl{color:var(--cyan)}
+  .warn{border-color:#5a4520;background:#1d1810}
+  .warn .lbl{color:var(--amber)}
+  .ok{border-color:#245240;background:#0e1f18}
+  .ok .lbl{color:var(--green)}
+
+  /* ---------- tables ---------- */
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14.5px}
+  th{
+    text-align:left;padding:12px 14px;background:var(--panel2);
+    font-size:10.5px;letter-spacing:2px;text-transform:uppercase;
+    color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line);
+  }
+  td{padding:13px 14px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td strong{color:#fff}
+  .col-good{color:var(--green)} .col-bad{color:var(--red)} .col-warn{color:var(--amber)}
+
+  /* ---------- phase cards ---------- */
+  .phase{
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--cyan-dim);
+    border-radius:0 8px 8px 0; padding:22px 26px; margin:18px 0;
+  }
+  .phase .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:4px;flex-wrap:wrap}
+  .phase .name{font-size:19px;font-weight:600;letter-spacing:0.5px}
+  .phase .tag{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+  .phase .exit{
+    margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);
+    font-size:14px;color:var(--muted);
+  }
+  .phase .exit b{color:var(--green);font-weight:600;letter-spacing:1px;font-size:10.5px;text-transform:uppercase;display:block;margin-bottom:5px}
+
+  /* ---------- lists of "no" ---------- */
+  .cut{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+  .cut span{
+    font-size:13px;padding:7px 13px;background:#1a1116;border:1px solid #3d2027;
+    border-radius:4px;color:#c98d97;text-decoration:line-through;
+  }
+
+  /* ---------- svg figure ---------- */
+  figure{margin:26px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px}
+  figcaption{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
+  svg{display:block;width:100%;height:auto}
+
+  /* ---------- ranked list ---------- */
+  .rank{list-style:none;margin-left:0;counter-reset:r}
+  .rank li{counter-increment:r;position:relative;padding-left:38px;margin-bottom:14px}
+  .rank li::before{
+    content:counter(r); position:absolute; left:0; top:1px;
+    width:24px;height:24px;border-radius:50%;background:var(--panel2);
+    border:1px solid var(--line);color:var(--cyan);
+    font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:600;
+  }
+
+  footer{margin-top:80px;padding-top:28px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+  footer b{color:var(--muted)}
+
+  @media print{
+    body{background:#fff;color:#111}
+    .panel,.phase,figure,.flag,blockquote{background:#fafafa;border-color:#ddd}
+    h2,h1 span,.chip.live,.kicker,th{color:#0a6f9e}
+    p,li,td{color:#222}
+    td strong,p strong,li strong{color:#000}
+    h1{color:#111}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Phase 0 — Design Review</div>
+  <h1>TI<span>D</span>E</h1>
+  <p class="sub">An aggressive pre-production critique of the tide-based territory mechanic, benchmarked against the genre it borrows from, with a phased roadmap and defined kill-tests.</p>
+  <div class="meta">
+    <span class="chip live">No code written</span>
+    <span class="chip">TypeScript</span>
+    <span class="chip">Phaser 3</span>
+    <span class="chip">WebGL</span>
+    <span class="chip">Desktop + Mobile Browser</span>
+    <span class="chip">Status: awaiting approval</span>
+  </div>
+</header>
+
+<!-- ============ VERDICT ============ -->
+<h2><span class="n">00</span> Verdict</h2>
+
+<div class="flag verdict">
+  <span class="lbl">The short version</span>
+  <p>The mechanic <strong>as described in the brief is weak</strong> — too vague, and one optimization away from being invisible. Sharpened into the specific ruleset below, it is <strong>strong</strong>: it adds a <em>temporal</em> decision axis to a genre that has run on <em>spatial</em> decisions for eight years, and it hands us an offense verb nobody in the genre has.</p>
+  <p style="margin-top:12px">Recommendation: <strong>build the sharpened version.</strong> Three alternatives are documented in section 10 for comparison. The tide's fate is settled by a kill-test defined in advance in section 6 — not by opinion, and not later.</p>
+</div>
+
+<!-- ============ CONCEPT ============ -->
+<h2><span class="n">01</span> The concept, stated precisely</h2>
+
+<p>The brief says "water/tide-based territory mechanic," which is too vague to build or critique. Here is the specific reading this document reviews:</p>
+
+<div class="quote">
+  <p>You are a boat on a grid of seabed with fixed per-cell <strong>elevation</strong>. A global water level rises and falls on a visible clock — roughly a 40-second period, split into 20s <strong>EBB</strong> (falling) and 20s <strong>FLOOD</strong> (rising).</p>
+  <p style="margin-top:14px"><strong>High tide (FLOOD):</strong> shallow reef flats submerge, giving wide open water, a fast boat, and long sightlines. But a strong <strong>current</strong> pushes your hull and the tide <strong>erodes</strong> your claimed edges. Capturing now scores a <strong>1.6&times; Surge multiplier</strong>.</p>
+  <p style="margin-top:14px"><strong>Low tide (EBB):</strong> flats dry into impassable land. Water contracts into deep channels — slow boat, narrow corridors, ambush country. Your territory <strong>locks and hardens</strong>; nothing erodes.</p>
+  <p style="margin-top:14px"><strong>Trails</strong> behave like Paper.io: loop back into your own water to bank the enclosed seabed as yours. <strong>Score is a round score</strong>, not a lifetime score.</p>
+</div>
+
+<p>The thesis: Paper.io is a <strong>spatial</strong> problem — <em>where</em> do I loop. TIDE makes it a <strong>spatial + temporal</strong> problem — <em>where</em> do I loop, <em>given what the water is about to do</em>. That single addition is the entire product, so it has to carry the entire product. Section 6 is where we find out whether it does.</p>
+
+<figure>
+<svg viewBox="0 0 880 230" role="img" aria-label="Tide cycle diagram: water level oscillating between EBB and FLOOD phases over a 40 second period">
+  <defs>
+    <linearGradient id="flood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f4515e" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#f4515e" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+
+  <!-- phase bands -->
+  <rect x="60" y="30" width="370" height="150" fill="url(#flood)" rx="4"/>
+  <text x="245" y="24" fill="#f4515e" font-size="11" letter-spacing="3" text-anchor="middle" font-family="Segoe UI">FLOOD — RISING</text>
+  <text x="245" y="196" fill="#f4515e" font-size="11" letter-spacing="1.5" text-anchor="middle" opacity="0.85" font-family="Segoe UI">greed: 1.6× · current · edges erode</text>
+
+  <rect x="430" y="30" width="390" height="150" fill="#4fc3f7" fill-opacity="0.06" rx="4"/>
+  <text x="625" y="24" fill="#4fc3f7" font-size="11" letter-spacing="3" text-anchor="middle" font-family="Segoe UI">EBB — FALLING</text>
+  <text x="625" y="196" fill="#4fc3f7" font-size="11" letter-spacing="1.5" text-anchor="middle" opacity="0.85" font-family="Segoe UI">safe: locked · slow · narrow channels</text>
+
+  <!-- mid line -->
+  <line x1="45" y1="105" x2="840" y2="105" stroke="#1c3044" stroke-width="1" stroke-dasharray="3 5"/>
+  <text x="40" y="109" fill="#5f7688" font-size="10" text-anchor="end" font-family="Segoe UI">L₀</text>
+
+  <!-- tide curve: 20s flood then 20s ebb over 40s -->
+  <path d="M60,165 C110,165 130,50 245,50 C300,50 320,72 370,88"
+        fill="none" stroke="#f4515e" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M430,88 C500,110 540,165 625,165 C720,165 780,160 820,158"
+        fill="none" stroke="#4fc3f7" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- peak + trough markers -->
+  <circle cx="245" cy="50" r="4.5" fill="#f4515e"/>
+  <text x="245" y="44" fill="#f4515e" font-size="10" text-anchor="middle" font-family="Segoe UI">HIGH</text>
+  <circle cx="625" cy="165" r="4.5" fill="#4fc3f7"/>
+  <text x="625" y="182" fill="#4fc3f7" font-size="10" text-anchor="middle" font-family="Segoe UI">LOW</text>
+
+  <!-- time axis -->
+  <line x1="60" y1="212" x2="820" y2="212" stroke="#1c3044"/>
+  <text x="60" y="228" fill="#5f7688" font-size="10" text-anchor="Segoe UI">t=0</text>
+  <text x="430" y="228" fill="#5f7688" font-size="10" text-anchor="Segoe UI">t=20s</text>
+  <text x="820" y="228" fill="#5f7688" font-size="10" text-anchor="end" font-family="Segoe UI">t=40s</text>
+</svg>
+<figcaption>One 40-second cycle. Both phases must be desirable for different reasons — that is the entire trick, and it is fragile.</figcaption>
+</figure>
+
+<!-- ============ LOOP ============ -->
+<h2><span class="n">02</span> Core gameplay loop</h2>
+
+<h4>Second-by-second &mdash; roughly 8 seconds per cycle</h4>
+<p>Read the tide clock &rarr; commit to a channel &rarr; lay trail &rarr; watch for interception &rarr; close the loop &rarr; bank the area &rarr; immediately reposition, because the water is about to change underneath you.</p>
+
+<h4>Round &mdash; 3 minutes</h4>
+<div class="panel">
+  <ul style="margin-bottom:0">
+    <li><strong>Open on EBB</strong> — safe, cramped, a quiet chance to learn the map.</li>
+    <li><strong>First FLOOD</strong> — the greed window opens. Everybody surges. Land grows fast and starts bleeding.</li>
+    <li><strong>EBB</strong> — hold and consolidate. What you kept is now hardened and permanent.</li>
+    <li><strong>FLOOD</strong> — erosion bites. The leader's fragile holdings strip away first.</li>
+    <li><strong>Final FLOOD</strong> — the round is decided by who over-extended.</li>
+  </ul>
+</div>
+
+<h4>Meta loop</h4>
+<p>You lose <strong>score</strong>, not just a life. A greedy flood-phase run shows a huge number that then visibly erodes away on screen. Watching your own 4,200 collapse to 2,900 is the emotional beat that makes you press play again. Nothing else in this genre produces that moment — they produce a death screen.</p>
+
+<!-- ============ RISK / REWARD ============ -->
+<h2><span class="n">03</span> Risk / reward — three axes instead of one</h2>
+
+<p>Paper.io has two: <strong>loop size</strong> and <strong>route safety</strong>. TIDE adds a third and makes the first two conditional on it.</p>
+
+<table>
+  <thead><tr><th>&nbsp;</th><th>Low tide &mdash; EBB</th><th>High tide &mdash; FLOOD</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Score</strong></td><td>1.0&times;</td><td class="col-good"><strong>1.6&times; Surge</strong></td></tr>
+    <tr><td><strong>Area available</strong></td><td>Small &mdash; channels only</td><td class="col-good">Large &mdash; reef flats open</td></tr>
+    <tr><td><strong>Boat speed</strong></td><td class="col-bad">Slow</td><td class="col-good">Fast</td></tr>
+    <tr><td><strong>Current</strong></td><td class="col-good">Weak</td><td class="col-bad">Strong &mdash; must counter-steer</td></tr>
+    <tr><td><strong>Your territory</strong></td><td class="col-good">Locked &amp; hardened</td><td class="col-bad">Actively eroding</td></tr>
+    <tr><td><strong>Dominant risk</strong></td><td class="col-warn">Ambush in narrow corridors</td><td class="col-warn">Cut off, washed out, edges stripped</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h3>Erosion as offense</h3>
+  <p>This is the piece that gives TIDE something Paper.io never had. In Paper.io the only way to hurt a player is to physically cut their trail. In TIDE you can hurt a player by <strong>surviving while they over-extend</strong>.</p>
+  <p style="margin-bottom:0">Aggression becomes <em>patience</em> — a far fresher aggressive archetype than "cut them off," and it means the leader is attackable without the leader ever making a mistake.</p>
+</div>
+
+<h3>Skill expression, ranked by depth</h3>
+<ol class="rank">
+  <li><strong>Counter-steering the current.</strong> Pure execution. Learnable in 30 seconds, and it separates players within the first minute.</li>
+  <li><strong>Timing the loop.</strong> Knowing a fourteen-second window exists and that your loop must <em>complete</em> before the turn.</li>
+  <li><strong>Territory geometry.</strong> Thin margins die first under erosion, so compact blobs beat sprawling webs. This rewards planning and quietly punishes the greedy beginner — the best kind of lesson, because it teaches without a tutorial.</li>
+  <li><strong>Routeing under threat.</strong> Reading other boats' trails and predicting where they intend to close.</li>
+</ol>
+<p>Four axes with genuine headroom. Paper.io really only has the fourth and a fragment of the third.</p>
+
+<!-- ============ REPLAYABILITY ============ -->
+<h2><span class="n">04</span> Replayability factors</h2>
+
+<div class="grid2">
+  <div class="panel" style="margin:0">
+    <h4>Structural</h4>
+    <ul style="margin-bottom:0">
+      <li><strong>3-minute rounds, ~2s respawn.</strong> Zero downtime. This alone fixes Paper.io's worst trait: a leaderboard game where dying costs you five minutes of boredom.</li>
+      <li><strong>A decision every 20 seconds</strong>, not just every run — the tide forces re-evaluation mid-run.</li>
+      <li><strong>Real comebacks.</strong> Erosion churns the leaderboard on its own, so the leader is never safe and anyone can win.</li>
+    </ul>
+  </div>
+  <div class="panel" style="margin:0">
+    <h4>Content economy</h4>
+    <ul style="margin-bottom:0">
+      <li><strong>Cheap variety.</strong> Tide amplitude, period, phase offset, map seed, bot count — these are <em>tables</em>, not assets.</li>
+      <li><strong>Readable skill gap.</strong> A noob sees a noob's flood gamble collapse. An expert sees exactly why. Same round, two levels of comprehension.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ COMPARISON ============ -->
+<h2><span class="n">05</span> Comparison with the genre</h2>
+
+<table>
+  <thead><tr><th style="width:15%">Game</th><th style="width:43%">What TIDE takes</th><th>What TIDE takes that it lacks</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Paper.io</strong></td>
+      <td>The enclose-a-loop verb, the grid, and above all its <em>legibility target</em> — one glance tells you everything. TIDE aims at that same bar, which is exactly why the tide must be a global overlay and never per-cell state.</td>
+      <td>A clock. An erosion mechanic. Offense-by-patience. <br><span style="color:var(--muted)">Paper.io's weakness we exploit: its meta is flat. Optimal play is "grow huge, then turtle forever," so the skill ceiling is route optimization and not much else.</span></td>
+    </tr>
+    <tr>
+      <td><strong>Hole.io</strong></td>
+      <td>The short round, frictionless onboarding, constant escalation, and the <em>no-punishment</em> feel of losing — you just stop growing rather than rage-quitting.</td>
+      <td>Death. Real stakes. A lethal, forecastable global event.<br><span style="color:var(--muted)">Hole.io's weakness we exploit: it has <strong>zero risk</strong>. You cannot die. TIDE restores death and makes the tide the thing that kills you.</span></td>
+    </tr>
+    <tr>
+      <td><strong>Agar.io</strong></td>
+      <td>Genuine PvP stakes, comeback potential, and a skill ceiling worth climbing.</td>
+      <td>Territory itself. Agar.io is a <em>presence</em> game — mass as power, no claims. TIDE is the opposite bet: control, not consumption. That also reads better on a phone, because a filled region is legible and a big dot is not.</td>
+    </tr>
+    <tr>
+      <td><strong>Snake.io</strong></td>
+      <td>Instant, pre-verbal readability of self-danger. You see your own trail and you know.</td>
+      <td>TIDE must earn that same clarity for <em>territory edges</em>, not just the trail.<br><span style="color:var(--muted)">Snake.io's weakness: no territory, low depth, becomes solved, feels cheap.</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="flag ok">
+  <span class="lbl">The gap nobody occupies</span>
+  <p>All four are <strong>spatial-only</strong> games. Not one of them makes the player manage a global clock that is simultaneously a scoring opportunity, a survival threat, and a weapon aimed at the leader. That is the space TIDE is built for.</p>
+</div>
+
+<!-- ============ RISKS ============ -->
+<h2><span class="n">06</span> Why it could fail</h2>
+
+<p>This is the section that matters most. Eight ways this dies, ordered by likelihood.</p>
+
+<div class="flag kill">
+  <span class="lbl">Failure 1 — most likely, and fatal</span>
+  <p><strong>The tide becomes a waiting room.</strong> On its face the brief's mechanic is decorative. A player who notices "land is safer" will simply sit in EBB, expand only in the calm, and never sail during FLOOD. If that player is right, we have built Paper.io with a progress bar.</p>
+  <p style="margin-top:10px">Everything in this document exists to prevent that, and prevention is not free. It requires the Surge multiplier to be genuinely tempting, the current to be a <em>skill test</em> rather than a punishment, and EBB to be cramped enough that turtling is uncomfortable.</p>
+</div>
+
+<div class="flag kill">
+  <span class="lbl">Kill-test — agreed now, so it cannot be rationalised away later</span>
+  <p>In a five-minute playtest, <strong>if a competent player never deliberately expands during FLOOD for the multiplier, the tide is decoration and we cut it.</strong> I am committing to this test before any code exists, because it is precisely the kind of decision that gets quietly reversed once implementation is 80% done and everyone is tired.</p>
+</div>
+
+<h3>Failure 2 — legibility collapse</h3>
+<p>Territory + trail + tide is three overlapping visual languages. Paper.io manages two and is already straining. This is the risk I take most seriously, and it is a <strong>rendering-architecture</strong> problem rather than a gameplay one: the tide must be a single global translucent water sheet plus a moving shoreline band, drawn <em>over</em> the grid — never as per-cell state. If any cell is ever individually "wet" or "dry," we have lost. You must never have to ask whether a cell is submerged. You ask whether a cell is <strong>yours</strong>.</p>
+
+<h3>Failure 3 — erosion feels like theft</h3>
+<p>If the tide silently eats your land, players will blame the game rather than their own greed. Erosion must be <strong>completely telegraphed</strong>: visibly thinner edges, an on-screen erosion warning, and a hard rule that you cannot lose land banked more than N seconds ago. Aggression toward players is unforgivable; a visible clock they chose to ignore is fair.</p>
+
+<h3>Failure 4 — water feels mushy</h3>
+<p>Grid-locked boats feel crisp. Water-simulated boats feel like syrup. TIDE stays on the grid and stays snapped. Any smooth-steering experiment is a trap, however good it feels in the first ten seconds.</p>
+
+<h3>Failure 5 — mobile</h3>
+<p>Water animation plus territory redraw plus trail, at 60fps, on a four-year-old Android, is not free. This is our single largest technical risk.</p>
+
+<h3>Failure 6 — skill compression</h3>
+<p>A global tide hits everyone simultaneously. During FLOOD, noobs are safer and pros are nerfed — the skill gap flattens exactly when it should be sharpest. This is inherent to a global clock and cannot be fully solved. The only real mitigation is making FLOOD a <em>steering</em> test, which punishes bad players harder than good players' opponents do. Accepted as a known cost, not designed away.</p>
+
+<h3>Failure 7 — bots that teach the wrong lesson</h3>
+<p>A dumb bot makes the game feel empty. An unfair bot makes it feel broken. Bots must be <em>beatable-looking</em>: they must visibly commit to a mistake you could have predicted.</p>
+
+<h3>Failure 8 — scope</h3>
+<p>Tide + erosion + current + surge + exposed land is five systems. <strong>The prototype must ship none of them.</strong> This requires discipline, not optimism.</p>
+
+<div class="flag verdict">
+  <span class="lbl">Section verdict</span>
+  <p>The mechanic as briefed is <strong>weak</strong>. Sharpened as in section 01, with the three specific commitments — <strong>the tide is a bet, the tide is a global overlay, erosion is telegraphed</strong> — it is <strong>strong</strong>. Recommendation: proceed to Phase 1 with the sharpened version, subject to the kill-test.</p>
+</div>
+
+<!-- ============ TECHNICAL ============ -->
+<h2><span class="n">07</span> Technical risk register</h2>
+
+<table>
+  <thead><tr><th style="width:26%">Risk</th><th style="width:10%">Severity</th><th>Mitigation</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Territory fill cost.</strong> Flood-fill on capture, multiplied by player count, plus erosion every tick. Naive implementation is a hard death.</td>
+      <td class="col-bad">CRITICAL</td>
+      <td>Capture uses a <strong>scanline flood fill</strong> restricted to the enclosed region. Erosion is a <strong>border-only pass</strong> — iterate owned cells adjacent to non-owned flooded cells. No flood at all on the hot path.</td>
+    </tr>
+    <tr>
+      <td><strong>Fixed-step simulation.</strong> Render coupled to logic means erosion rate varies by machine.</td>
+      <td class="col-bad">CRITICAL</td>
+      <td>Simulation on a fixed <strong>10&nbsp;Hz tick</strong>, decoupled from render. Every rate is expressed per-tick, never per-frame. Non-negotiable from the first commit.</td>
+    </tr>
+    <tr>
+      <td><strong>Mobile performance.</strong> Per-tile Graphics rebuilds will melt a phone.</td>
+      <td class="col-warn">HIGH</td>
+      <td>Territory drawn into a <code>RenderTexture</code>, redrawn on a dirty-rect basis. Water is one full-screen shader/graphics layer. DPR capped at 2.</td>
+    </tr>
+    <tr>
+      <td><strong>Phaser Arcade Physics is the wrong tool.</strong> It wants continuous bodies; we want grid-locked kinematics.</td>
+      <td class="col-warn">HIGH</td>
+      <td>Manual integration. <strong>No Arcade, no Matter.</strong> Document this in the README so nobody helpfully adds it in month three.</td>
+    </tr>
+    <tr>
+      <td><strong>State serialization.</strong> Netcode arrives in Beta; retro-fitting authority retroactively is brutal.</td>
+      <td style="color:var(--amber)">MEDIUM</td>
+      <td>The entire world state is <em>a grid plus a player array</em>. Keep it plain and serialisable from day one, even with a single local bot. Costs nothing now; saves weeks in Beta.</td>
+    </tr>
+    <tr>
+      <td><strong>Trail memory.</strong> Naive trails leak.</td>
+      <td class="col-dim" style="color:var(--dim)">LOW</td>
+      <td>Trail is an array of cell indices per player, capped, cleared on death.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============ ARCHITECTURE ============ -->
+<h2><span class="n">08</span> Architecture</h2>
+
+<p>Your system list is right, and I would resist anything larger. Two additions I'd insist on, both small:</p>
+
+<div class="panel">
+  <h4>Additions to the specified list</h4>
+  <ul>
+    <li><code>Grid</code> — owns the elevation/depth field and passability queries. It is data plus one function, not a system and not a framework. Without it, tide logic leaks into <code>Player</code>, <code>Bot</code>, and <code>TerritorySystem</code> simultaneously.</li>
+    <li><code>SimClock</code> — the fixed 10&nbsp;Hz tick. Not an ECS, not a scheduler. Just the thing that makes erosion deterministic across machines.</li>
+  </ul>
+  <p style="margin-bottom:0">Everything else exactly as specified: <code>GameScene</code>, <code>Player</code>, <code>Bot</code>, <code>TrailSystem</code>, <code>TerritorySystem</code>, <code>UI</code>.</p>
+</div>
+
+<p><strong>Explicitly rejected:</strong> dependency injection, plugin systems, ECS, microservices, entity-component systems, manager-within-manager patterns. If a file needs an interface, we write the interface when the second implementation exists — not before.</p>
+
+<!-- ============ ROADMAP ============ -->
+<h2><span class="n">09</span> Roadmap</h2>
+
+<div class="phase">
+  <div class="top"><div class="name">Phase 1 &mdash; Prototype</div><div class="tag">Smallest playable thing</div></div>
+  <p>Fixed hand-placed map. One human, one bot. Movement, trail, capture, death, respawn, round score, minimal HUD. <strong>Zero tide.</strong></p>
+  <p>We validate the base loop, our grid code, and our controls <em>before</em> layering the risky mechanic on top. If capture does not feel good, tide will not save it.</p>
+  <div class="exit"><b>Exit criteria</b>A stranger understands and captures land within 60 seconds, dies on their own intent, and asks for another round.</div>
+</div>
+
+<div class="phase">
+  <div class="top"><div class="name">Phase 2 &mdash; MVP</div><div class="tag">Add the tide</div></div>
+  <p>Tide clock, water level, depth-based passability, erosion on flood, Surge multiplier, current field, 3-minute round, touch controls. Bot updated to respect the tide.</p>
+  <div class="exit"><b>Exit criteria</b>Kill-test passes — players expand on flood deliberately. Legibility test passes — players state the tide phase within 2 seconds of looking at the screen. 60fps on a mid-range phone.</div>
+</div>
+
+<div class="phase">
+  <div class="top"><div class="name">Phase 3 &mdash; Alpha</div><div class="tag">Make it a game</div></div>
+  <p>Five bot archetypes — Expander, Ambusher, Farmer, Tide-Timer, Opportunist. Map seeds. Art and audio pass. A self-teaching first 15 seconds. Quality and colourblind settings. Local 2P.</p>
+  <div class="exit"><b>Exit criteria</b>No single bot strategy dominates. Players must visibly adapt between rounds.</div>
+</div>
+
+<div class="phase">
+  <div class="top"><div class="name">Phase 4 &mdash; Beta</div><div class="tag">The hard one</div></div>
+  <p>Server-authoritative netcode, matchmaking, persistence and progression, anti-cheat baseline, low-end mobile performance, PWA, analytics and crash reporting, store page, load testing.</p>
+  <div class="exit"><b>Exit criteria</b>500 concurrent with zero desync. Crash-free above 99.5%. p95 join under 8 seconds.</div>
+</div>
+
+<div class="phase">
+  <div class="top"><div class="name">Phase 5 &mdash; Launch</div><div class="tag">Go live</div></div>
+  <p>Store presence, creator push, leaderboards, seasons, live balance loop driven by telemetry.</p>
+  <div class="exit"><b>Success metrics</b>D1 retention above 35%. Median session above 6 minutes. D7 above 12%.</div>
+</div>
+
+<h3>GitHub-first workflow</h3>
+<p><code>main</code> is stable-only and branch-protected. All work goes <code>feature/*</code> &rarr; commit &rarr; push &rarr; PR &rarr; <code>development</code>. CI runs on every PR: typecheck, build, and a headless simulation smoke test. No direct pushes to <code>main</code>, ever, including hotfixes — hotfixes go <code>fix/*</code> &rarr; PR &rarr; <code>main</code> &rarr; back-merge to <code>development</code>.</p>
+
+<h4>Commit convention</h4>
+<div class="panel" style="font-family:Consolas,monospace;font-size:13.5px;color:var(--muted)">
+  <div style="color:var(--green)">feat: add boat movement</div>
+  <div style="color:var(--green)">feat: implement trail system</div>
+  <div style="color:var(--green)">feat: add territory capture</div>
+  <div style="color:var(--red)">fix: territory collision bug</div>
+  <div style="color:var(--violet)">refactor: simplify capture logic</div>
+  <div style="margin-top:12px;color:#5f7688">rejected: &nbsp;update &nbsp;·&nbsp; changes &nbsp;·&nbsp; fixes &nbsp;·&nbsp; work</div>
+</div>
+
+<h3>What we are deliberately not building</h3>
+<p>Per the quality rule — if a feature does not improve territory control, risk versus reward, or replayability, it does not get built:</p>
+<div class="cut">
+  <span>accounts before Beta</span><span>cosmetics before Beta</span><span>chat</span><span>clans</span>
+  <span>gifting</span><span>energy timers</span><span>upgrade tree</span><span>tutorial past 15 seconds</span>
+  <span>seasonal events</span><span>multiple boat types</span><span>skill trees</span><span>loot boxes</span>
+</div>
+
+<!-- ============ ALTERNATIVES ============ -->
+<h2><span class="n">10</span> Alternatives, if the tide still reads weak</h2>
+
+<p>Three stronger-in-a-specific-direction alternatives in the same .io territory-control genre, provided so the choice is deliberate rather than defaulted into.</p>
+
+<table>
+  <thead><tr><th style="width:14%">Name</th><th style="width:32%">Core change</th><th style="width:27%">Stronger at</th><th>Weaker at</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A — LATTICE</strong></td>
+      <td>You claim by <em>connecting cells you already own</em> into a spanning structure, not by enclosing. Surgical, low-area, deliberate.</td>
+      <td><span class="col-good">Depth and mastery.</span> A genuinely high skill ceiling; each capture is a small precise act rather than one big greedy loop.</td>
+      <td><span class="col-bad">Onboarding and mobile legibility.</span> Newcomers will not read this in 60 seconds, and a sparse web of cells is harder to parse on a phone than a solid blob.</td>
+    </tr>
+    <tr>
+      <td><strong>B — WILDFIRE</strong></td>
+      <td>Claimed cells decay continuously and must be re-fed. Circling becomes defense.</td>
+      <td><span class="col-good">Tension and aggression.</span> Constant pressure, no safe parking, high drama.</td>
+      <td><span class="col-bad">Tone.</span> It can read as stressful rather than fun, and the optimal play is genuinely hard to discover without a tutorial we have promised not to build.</td>
+    </tr>
+    <tr>
+      <td><strong>C — STRATA</strong></td>
+      <td>You claim by <em>descending</em>. Each layer down is richer, and the surface above collapses behind you.</td>
+      <td><span class="col-good">Novelty and a fresh risk axis.</span> Depth becomes the resource, and retreat is impossible.</td>
+      <td><span class="col-bad">Legibility and camera.</span> Depth is hard to render readably, and it fights the flat top-down view that territory games depend on entirely.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="flag verdict">
+  <span class="lbl">Ranking</span>
+  <p style="margin-bottom:8px"><strong>Sharpened TIDE &gt; LATTICE &gt; STRATA &gt; WILDFIRE</strong></p>
+  <p style="margin:0">TIDE wins because it inherits Paper.io's proven legibility and adds exactly <em>one</em> idea, whereas each alternative replaces the core verb and inherits onboarding risk we would have to pay off later. LATTICE is the one I would revisit first if playtests show TIDE's ceiling is too shallow.</p>
+</div>
+
+<!-- ============ GATE ============ -->
+<h2><span class="n">11</span> Phase 0 gate</h2>
+
+<div class="panel">
+  <h4>Open decisions — needed before any code is written</h4>
+  <ul>
+    <li><strong>Mechanic direction.</strong> Sharpened TIDE, or one of the three alternatives.</li>
+    <li><strong>Theme and art direction.</strong> Undecided. This matters more than it looks: the fiction is what makes erosion feel fair. If territory is "what you have charted," decay is the tide taking your work back. If it is abstract territory, erosion reads as theft.</li>
+  </ul>
+  <p style="margin-bottom:0">Also worth settling early, though they do not block Phase 1: whether Phase 1 ships the fixed map or a seeded one, and whether local 2P is a Phase 3 feature or a control on day one.</p>
+</div>
+
+<div class="flag kill">
+  <span class="lbl">Standing constraint for Phase 1</span>
+  <p style="margin:0">Phase 1 contains <strong>no tide, no current, no erosion, no surge, and no art beyond functional colour.</strong> If a tide system appears in a Phase 1 branch, it does not merge. The prototype's only job is to prove that our capture loop feels good in our codebase, on our controls, before we build a mechanic that depends on it.</p>
+</div>
+
+<footer>
+  <b>TIDE — Phase 0 Design Review.</b> No production code written. Awaiting approval on the two open decisions above before Phase 1 begins.
+</footer>
+
+</div>
+</body>
+</html>

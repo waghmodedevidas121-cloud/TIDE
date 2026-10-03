@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE — Reverse Engineering Review: paper.io</title>
+<style>
+  :root{
+    --bg:#0b1622; --panel:#101f2e; --panel2:#0c1826; --line:#1c3044;
+    --ink:#e8f1f8; --muted:#8ba3b8; --dim:#5f7688;
+    --cyan:#4fc3f7; --cyan-dim:#2a7fa8;
+    --green:#5ddc9a; --amber:#ffb547; --red:#f4515e; --violet:#a78bfa; --pink:#f472b6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px 100px}
+  header{padding:70px 0 44px;border-bottom:1px solid var(--line);margin-bottom:44px}
+  .kicker{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:18px}
+  h1{font-size:52px;font-weight:200;letter-spacing:10px;line-height:1.05;margin-bottom:16px}
+  h1 span{color:var(--cyan)}
+  .sub{color:var(--muted);font-size:17px;max-width:700px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+  .chip{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 12px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+  .chip.live{border-color:var(--cyan-dim);color:var(--cyan)}
+
+  h2{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin:68px 0 20px;padding-bottom:12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:12px}
+  h2 .n{color:var(--dim);font-weight:400;letter-spacing:1px}
+  h3{font-size:17px;font-weight:600;margin:32px 0 10px}
+  h4{font-size:14px;font-weight:600;margin:22px 0 6px;color:var(--cyan)}
+  p{margin-bottom:14px;color:#c9d8e4}
+  p strong,li strong{color:#fff;font-weight:600}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  ul{margin:0 0 16px 20px}li{margin-bottom:9px;color:#c9d8e4}
+  code{font-family:Consolas,'SF Mono',monospace;font-size:13px;background:var(--panel2);padding:2px 6px;border-radius:3px;color:var(--cyan)}
+  .file{font-family:Consolas,monospace;font-size:12.5px;color:var(--amber)}
+
+  .quote{border-left:3px solid var(--cyan);background:var(--panel);padding:22px 26px;margin:24px 0;border-radius:0 6px 6px 0}
+  .quote p{font-size:17px;color:#dcebf6;margin:0 0 12px}
+  .quote p:last-child{margin-bottom:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px 26px;margin:22px 0}
+  .panel h3:first-child,.panel h4:first-child{margin-top:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}h1{font-size:32px;letter-spacing:5px}}
+
+  .flag{border-radius:8px;padding:20px 24px;margin:22px 0;border:1px solid}
+  .flag .lbl{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;margin-bottom:8px;display:block}
+  .flag p:last-child,.flag ul:last-child{margin-bottom:0}
+  .kill{border-color:#5a2a2f;background:#1c1116}.kill .lbl{color:var(--red)}
+  .verdict{border-color:#1d4a5e;background:#0e2029}.verdict .lbl{color:var(--cyan)}
+  .warn{border-color:#5a4520;background:#1d1810}.warn .lbl{color:var(--amber)}
+  .ok{border-color:#245240;background:#0e1f18}.ok .lbl{color:var(--green)}
+  .note{border-color:#3a3050;background:#15121f}.note .lbl{color:var(--violet)}
+
+  table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14.5px}
+  th{text-align:left;padding:12px 14px;background:var(--panel2);font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td strong{color:#fff}
+  .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}.v{color:var(--violet)}
+
+  figure{margin:26px 0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px 18px 16px}
+  figcaption{font-size:13px;color:var(--muted);margin-top:12px;text-align:center;padding:0 6px}
+  svg{display:block;width:100%;height:auto}
+
+  .tl{list-style:none;margin-left:0}
+  .tl li{position:relative;padding-left:96px;margin-bottom:20px}
+  .tl li .at{position:absolute;left:0;top:1px;font-family:Consolas,monospace;font-size:12px;color:var(--cyan);background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:3px 8px}
+  .tl li .bd{color:#c2d3e0}
+
+  .three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
+  @media(max-width:760px){.three{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
+  .card .k{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  .card .v2{font-size:20px;font-weight:600;margin-bottom:6px}
+  .card .d2{font-size:13.5px;color:#b4c7d6}
+
+  .seclabel{font-size:11px;letter-spacing:3px;text-transform:uppercase;font-weight:700;padding:16px 20px;border-radius:8px 8px 0 0}
+  .keep .seclabel{background:#12301f;color:var(--green)}
+  .imp .seclabel{background:#3a2c10;color:var(--amber)}
+  .repl .seclabel{background:#33161b;color:var(--red)}
+  .seclist{background:var(--panel);border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;padding:6px 24px 20px;margin:-14px 0 26px}
+  .seclist ol{margin-left:20px}.seclist li{margin-bottom:13px;color:#c2d3e0}
+  .seclist li b{color:#fff}
+
+  footer{margin-top:80px;padding-top:28px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+  footer b{color:var(--muted)}
+  @media print{body{background:#fff;color:#111}.panel,figure,.flag,.quote,.card,.seclist{background:#fafafa;border-color:#ddd}
+    h2,h1 span,.chip.live,.kicker,th,.card .v2{color:#0a6f9e}p,li,td{color:#222}td strong,p strong,li strong{color:#000}h1{color:#111}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Reverse-Engineering Review — Phase 0</div>
+  <h1>PAPER<span>.IO</span></h1>
+  <p class="sub">A systems-level teardown of <span class="file">stevenjoezhang/paper.io</span> — why the game works, what it actually is underneath, how it is built, and what it hands TIDE.</p>
+  <div class="meta">
+    <span class="chip live">Read-only analysis · nothing modified</span>
+    <span class="chip">33 files</span>
+    <span class="chip">~1,700 lines of source</span>
+    <span class="chip">Canvas 2D</span>
+    <span class="chip">Socket.IO</span>
+    <span class="chip">Node + Rollup</span>
+  </div>
+</header>
+
+<!-- ============ HEADLINE ============ -->
+<h2><span class="n">00</span> Headline findings</h2>
+
+<div class="flag kill">
+  <span class="lbl">The finding that invalidates part of my own Phase 0 analysis</span>
+  <p><strong>When a player dies, their entire territory is erased to neutral.</strong> Not kept, not transferred — deleted, and immediately claimable by anyone. This is in <span class="file">src/core/index.js:94-98</span>:</p>
+  <p style="margin-top:12px;font-family:Consolas,monospace;font-size:13px;color:var(--amber)">for (let r = 0; r &lt; grid.size; r++)<br>&nbsp;&nbsp;for (let c = 0; c &lt; grid.size; c++)<br>&nbsp;&nbsp;&nbsp;&nbsp;if (adead.indexOf(grid.get(r, c)) !== -1) grid.set(r, c, null);</p>
+  <p style="margin-top:12px">I asserted in Phase 0 that "Paper.io lets you keep your territory when you die." <strong>That is wrong for this codebase.</strong> It changes the entire psychological model, and it turns out to be the single most important mechanic in the game — the map is a <em>renewable resource</em>, and death is a redistribution event, not just a loss.</p>
+</div>
+
+<div class="flag kill">
+  <span class="lbl">There is no game here</span>
+  <p>No score object. No round timer. No match end. No respawn. No leaderboard on the server. I grepped for it: <strong>there is no <code>score</code>, <code>round</code>, <code>matchTime</code>, <code>gameOver</code>, <code>respawn</code> or <code>countdown</code> anywhere in <span class="file">src/</span>.</strong> The server runs one infinite world at 60Hz until 30 players are connected and the map fills up. "Score" is a client-side percentage of cells owned, displayed to three decimal places.</p>
+</div>
+
+<div class="flag verdict">
+  <span class="lbl">What this means for TIDE</span>
+  <p>Paper.io's <strong>zero-maintenance territory is not an unfinished feature. It is load-bearing.</strong> It is the exact condition that makes the resource satisfying — a permanent asset with no upkeep, acquired by spending a temporary liability. TIDE's thesis is to add decay. This review concludes that decay does not deepen this game, it <em>replaces</em> it with a different and worse one, and that a global tide clock is the specific mechanism that destroys the emergence the genre depends on. Details and the recommended pivot are in <strong>Part 07</strong>.</p>
+</div>
+
+<!-- ============ PART 1 ============ -->
+<h2><span class="n">01</span> Part 1 — Gameplay</h2>
+
+<h3>Core gameplay loop</h3>
+<p>There are three nested loops, and the outermost one is broken by design omission:</p>
+
+<div class="panel">
+  <p style="margin:0"><strong>Micro-loop (~1s).</strong> Choose one of four headings → commit to a line of cells → watch the % counter move or not move. Resolution time is 8 ticks (SPEED 5 across a 40px cell) plus 24 frames of HUD interpolation — roughly <strong>0.4 seconds from input to visible number</strong>. That latency is the whole game feel.</p>
+  <p style="margin-bottom:0"><strong>Expansion loop (~10–40s).</strong> Leave territory → carve a loop → return to land → bank it. This is the loop players actually think about. Its length is the entire risk dial.</p>
+</div>
+
+<div class="flag warn">
+  <span class="lbl">Session loop — does not exist</span>
+  <p>There is no match. The world runs until the grid is full (<span class="file">game-server.js:17</span> only <code>console.log</code>s "FULL GAME"). There is no end screen, no victory, no result. A session ends when the player gets bored, gets killed enough times, or closes the tab. <strong>There is no satisfying beat and no natural exit point</strong> — which is precisely the gap TIDE should attack first.</p>
+</div>
+
+<h3>Risk / reward loop — the actual math</h3>
+<p>This is the part nobody explains about Paper.io, and it explains the shape of every territory on the map.</p>
+
+<p>A loop of perimeter <em>P</em> encloses roughly <em>P²/16</em> area, while exposing <em>P</em> cells of tail. So <strong>reward is superlinear in exposure</strong>. Bigger loops are more efficient, not riskier. Combined with territory having zero maintenance cost, greed is not merely tempting — it is <em>correct</em>.</p>
+
+<div class="flag ok">
+  <span class="lbl">The consequence nobody names</span>
+  <p>The area-maximising shape is a <strong>very long, very thin rectangle</strong>, and the best place to draw it is <em>hugging your own existing border</em>. That is why every Paper.io territory in every screenshot is a ribbon or a comb, never a square. The genuine core skill of this game is <strong>contour-following your own frontier</strong> — minimising exposure by expanding outward along a boundary you already own.</p>
+  <p style="margin-top:10px">This is an elegant, teachable, deeply satisfying skill that costs nothing to teach — the map teaches it by example within two loops. It is also, crucially, a <em>purely spatial</em> skill with no time component at all.</p>
+</div>
+
+<h3>Player psychology</h3>
+
+<table>
+  <thead><tr><th style="width:26%">Behaviour</th><th>Mechanism that causes it</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Players expand</strong></td><td>Area is the only score. It is shown as a live percentage to three decimals. The leaderboard normalises every bar to the leader, so the gap is always visible and always closing-able. And banking is <em>free</em> — captured cells cost nothing to hold, forever.</td></tr>
+    <tr><td><strong>Players become greedy</strong></td><td>Three reinforcing pressures: (1) reward is superlinear in exposure; (2) there is no maintenance cost, so holding is free and hoarding is unpunished; (3) the camera zooms out as you grow (<code>zoom = 1/(portion+1)</code>, <span class="file">mode/player.js:286</span>), so success literally feels like a wider view. Greed is the correct play and the game never tells you otherwise.</td></tr>
+    <tr><td><strong>Players stop expanding</strong></td><td>The bots encode this in one line: <code>thres = (.05 + .1*Math.random()) * GRID²</code> (<span class="file">paper-io-bot.js:61</span>). At 5–15% map share the bot stops expanding and starts surviving. Once your territory is large enough to be safe, turtling strictly dominates.</td></tr>
+    <tr><td><strong>Players hunt</strong></td><td>Kills are a separate stat from area, so they are a distinct achievement axis. Killing does not transfer land — it <em>returns</em> land to neutral. The real payoff is removing a competitor and opening contested space.</td></tr>
+  </tbody>
+</table>
+
+<h3>Why deaths feel fair</h3>
+<p>Three mechanisms, and they are the reason the genre can afford such brutal stakes:</p>
+
+<div class="grid2">
+  <div class="panel" style="margin:0">
+    <h4>1 · Total legibility</h4>
+    <p style="margin-bottom:0">Your tail is drawn in full, always. Territory is drawn in full. Every enemy is drawn. You can enumerate exactly what will kill you by looking at the frame before it happens. Nothing is hidden, nothing is random, nothing is off-screen.</p>
+  </div>
+  <div class="panel" style="margin:0">
+    <h4>2 · Almost always self-inflicted</h4>
+    <p style="margin-bottom:0">The dominant death is running into your own tail — which you drew yourself, and which is on screen. Self-inflicted death always feels earned. The game never takes anything you did not do to yourself.</p>
+  </div>
+  <div class="panel" style="margin:0">
+    <h4>3 · Home is genuinely safe</h4>
+    <p style="margin-bottom:0">If a bigger player collides with you while you are standing on your own territory, <em>they</em> die (<span class="file">core/index.js:50-57</span>). The game promises that home is safe and it honours the promise. This one rule is what makes 20% of the map feel defensible.</p>
+  </div>
+  <div class="panel" style="margin:0">
+    <h4>4 · No cheap spawn deaths</h4>
+    <p style="margin-bottom:0"><code>NEW_PLAYER_LAG = 60</code> freezes every player for one second at spawn. You get a clean read on the map before anyone can end you.</p>
+  </div>
+</div>
+
+<div class="flag note">
+  <span class="lbl">But the punishment is absolute</span>
+  <p>Fairness is not leniency. You lose <strong>100% of your land</strong> on death. What makes that survivable is not a mechanic — it is that there is no respawn, so the death screen with a single "Play Again" button becomes the processing buffer. <strong>The downtime substitutes for the punishment.</strong> TIDE cannot add decay on top of this; the penalty is already at maximum.</p>
+</div>
+
+<h3>Why replay happens</h3>
+<ul>
+  <li><strong>One click.</strong> "Play Again" reconnects. Total downtime is roughly 3–5 seconds including the 60-frame death hold.</li>
+  <li><strong>Nothing to lose.</strong> No currency, no unlocks, no persistence, no progression, no meta. The entire cost of a life is a life.</li>
+  <li><strong>No waiting.</strong> No queue, no match start, no loading. Spectator mode is even exposed as a one-click button.</li>
+  <li><strong>The map is recycled.</strong> Every death returns a big chunk of the map to neutral, so the world visibly reopens for everyone — which reads, to players, as <em>fresh opportunity</em> rather than as a death.</li>
+</ul>
+
+<h3>The first 30 seconds</h3>
+<div class="panel">
+  <p style="margin:0"><strong>Identity first.</strong> The very first screen asks for a name. This is the only customisation in the entire game, and asking for it <em>before</em> play creates ownership of the identity you will be ranked against. Cheap, and unusually effective.</p>
+</div>
+<ul class="tl">
+  <li><span class="at">0.0–1.5s</span><span class="bd">A socket handshake fires <code>pings</code>, the server replies <code>pongs</code> and disconnects, and only then is the Play button enabled. A free connectivity probe disguised as nothing.</span></li>
+  <li><span class="at">1.5–2.5s</span><span class="bd">Spawn with a 3×3 territory (<code>initPlayer</code> stamps a 3×3 block) and a one-second freeze. Camera centred, zoom ≈ 0.9, so you see roughly a fifth of the map.</span></li>
+  <li><span class="at">2.5–5s</span><span class="bd">The HUD is already showing everything: your name, your % (already 0.09%), <strong>Kills: 0</strong>, <strong>Rank: X of N</strong>, and five rolling leaderboard bars. The goal is understood in under two seconds without a single word of tutorial.</span></li>
+  <li><span class="at">5–15s</span><span class="bd">The player presses a direction. Nothing else is explained and nothing needs to be. The first accidental rectangle typically completes inside 15 seconds because the spawn block is tiny and adjacent.</span></li>
+  <li><span class="at">15s+</span><span class="bd"><strong>The % counter is the teacher.</strong> It moves the instant a loop banks, it moves continuously, and it is the only number that matters. This is the entire tutorial and it costs zero words.</span></li>
+</ul>
+
+<h3>The first 3 minutes</h3>
+<ul>
+  <li>Two or three accidental successes, and at least one death — almost certainly self-inflicted, therefore absorbed without resentment.</li>
+  <li>The <strong>ribbon shape appears.</strong> The player stops drawing squares and starts drawing long thin claims along their own border. This is the moment the game is actually learned, and it arrives unprompted.</li>
+  <li>The leaderboard has become an <em>enemy</em>. There is a specific person at rank 1 and a specific percentage to beat.</li>
+  <li>The first real strategic decision is made, and it is made implicitly: <strong>turtle or run</strong>. Turtle is safe and caps your rank. Run is fast and can delete you. Most players do not notice they have chosen.</li>
+</ul>
+
+<h3>The first 10 minutes</h3>
+<ul>
+  <li>Map share is typically 25–40% claimed. Neutral space has fragmented into awkward pockets.</li>
+  <li>The game has silently changed phase. Expansion is no longer easy, so the fastest remaining growth path is <strong>killing someone</strong> — because their land returns to neutral and you were often already outside and waiting.</li>
+  <li>Deaths are now frequent and expensive. The map visibly "breathes" as big players die and re-flood neutral ground. This is the best emergent drama in the genre and it is entirely unscripted.</li>
+  <li><strong>The game then runs out.</strong> With no neutral space left, there is nothing to switch to. Players stall, get picked off, and leave. There is no endgame to migrate into.</li>
+</ul>
+
+<!-- ============ PART 2 ============ -->
+<h2><span class="n">02</span> Part 2 — Game design</h2>
+
+<div class="three">
+  <div class="card"><div class="k">Main resource</div><div class="v2">Unclaimed cells</div><div class="d2">A fixed 10,000-cell shared board. The real currency is <em>exposure</em> — the length of your own live tail.</div></div>
+  <div class="card"><div class="k">Main risk</div><div class="v2">Your own tail</div><div class="d2">Plus the map edge, plus any larger player while you are outside. Never anything you cannot see.</div></div>
+  <div class="card"><div class="k">Main reward</div><div class="v2">Area, as % of map</div><div class="d2">Normalised against the current leader. Continuous, always-moving, zero-decimal-latency feedback.</div></div>
+</div>
+
+<h3>What is the actual game?</h3>
+<p>Not paper. Not territory. Not even competition. Strip the theme and it is:</p>
+
+<div class="quote">
+  <p>A <strong>competitive enclosure market</strong> on a single shared finite board. Every player owns a connected set of cells. A claim is acquired by spending a <em>temporarily exclusive</em> asset (your tail) to acquire a <em>permanently exclusive</em> asset (cells). Value is created by conversion: risk becomes ownership. The terminal state is a board with no neutral cells — which is to say the game has no terminal state at all.</p>
+</div>
+
+<p>And at a deeper level, it is an <strong>option-pricing game</strong>:</p>
+
+<div class="quote">
+  <p>Your territory is a <strong>permanent asset with zero maintenance cost</strong>. Your tail is a <strong>short-lived position of risk</strong>. Every loop is a trade: surrender a volatile liability to acquire a stable asset. Because assets never decay, holding is free, hoarding is unpunished, and greed is provably optimal. All that remains for skill to exploit is <strong>how fast you can convert risk into area</strong> — i.e. route selection, contouring, and baiting.</p>
+</div>
+
+<div class="flag kill">
+  <span class="lbl">The consequence for TIDE, stated plainly</span>
+  <p>This game has <strong>no time dimension whatsoever</strong>. Every decision a player makes is spatial. That is not an oversight — it is the direct consequence of zero-maintenance assets: if nothing decays, then timing never matters, because there is no external schedule to be synchronised with.</p>
+  <p style="margin-top:12px">TIDE's pitch is to add a clock. But the analysis shows the clock is not an <em>omission</em> in the original — it is <strong>load-bearing</strong>. Add passive decay and you have not deepened Paper.io; you have converted a clean permanent asset into a depreciating one, which is a different resource with different psychology, and the "risk vs reward" tension you were hoping to sharpen turns into "risk vs a timer that ignores you."</p>
+</div>
+
+<!-- ============ PART 3 ============ -->
+<h2><span class="n">03</span> Part 3 — Technical architecture</h2>
+
+<h4>Folder structure</h4>
+<pre style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:18px 20px;overflow-x:auto;font-family:Consolas,monospace;font-size:12.5px;color:#9fc4d8;line-height:1.5;margin:16px 0">
+<b>server.js</b>              HTTP + Socket.IO bootstrap; 60Hz setInterval; forks N bot processes
+<b>config.js</b>              Single tuning file (dev, port, bots, fps) + consts (grid, cell, speed)
+<b>client.js</b>              <span style="color:#6f8296">▸ browser entry</span>  input (keys + swipe), menu, name, wiring
+<b>bot.js</b>                 <span style="color:#f4515e">✖ BROKEN</span>        genetic-weight bot; undeclared globals → ReferenceError
+<b>paper-io-bot.js</b>        <span style="color:#5ddc9a">✔ ACTIVE</span>      headless client bot; deobfuscated Paper.io AI
+  src/
+    game-client.js           Socket lifecycle, frame loop, resync, prediction entry point
+    game-server.js           Authoritative player list, snapshot, membership, colour pool
+    core/                    <span style="color:#ffb547">◂ THE SHARED SIMULATION ◂</span>
+      index.js               updateFrame: movement, all collision rules, death cleanup
+      player.js              Player + Tail: movement, RLE trail, fillTail, floodFill, render
+      grid.js                Sparse 2D array with a change callback
+      stack.js               Preallocated array-backed stack (GC avoidance)
+      color.js               HSL colour, interpolation, 81-colour shuffled palette
+    mode/
+      player.js              Play renderer: viewport culling, drop-shadow grid, HUD, zoom
+      god.js                 Spectator renderer (free-cam, same grid, no user)
+  public/                    index.html, styles.css, fonts, images, music, js/bundle.js
+  rollup.config.js           Bundles client.js → IIFE bundle
+</pre>
+
+<div class="flag ok">
+  <span class="lbl">The one architectural decision everything else hangs off</span>
+  <p><code>src/core/</code> is imported <strong>byte-for-byte identically by the server, the browser, and every bot process</strong>. There is one simulation, not three. Everything else in this codebase follows from that decision — including the entire networking model.</p>
+</div>
+
+<figure>
+<svg viewBox="0 0 900 500" role="img" aria-label="Architecture diagram showing a shared simulation core imported identically by the browser client, the Node server, and headless bot processes">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#4fc3f7"/>
+    </marker>
+    <marker id="ahg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5ddc9a"/>
+    </marker>
+  </defs>
+
+  <!-- BROWSER -->
+  <rect x="16" y="40" width="330" height="330" rx="10" fill="#0c1826" stroke="#1c3044"/>
+  <text x="30" y="62" fill="#8ba3b8" font-size="11" letter-spacing="3" font-family="Segoe UI">BROWSER  ·  one tab</text>
+
+  <rect x="32" y="76" width="298" height="42" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="46" y="94" fill="#e8f1f8" font-size="12.5" font-family="Consolas">client.js</text>
+  <text x="46" y="110" fill="#5f7688" font-size="10.5" font-family="Segoe UI">keys / swipe → heading · menu · name entry</text>
+
+  <rect x="32" y="126" width="298" height="52" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="46" y="145" fill="#e8f1f8" font-size="12.5" font-family="Consolas">src/game-client.js</text>
+  <text x="46" y="161" fill="#5f7688" font-size="10.5" font-family="Segoe UI">socket lifecycle · frame counter · desync resync</text>
+  <text x="46" y="174" fill="#5f7688" font-size="10.5" font-family="Segoe UI">3s inactivity timeout → hard disconnect</text>
+
+  <rect x="32" y="186" width="298" height="86" rx="6" fill="#12212f" stroke="#ffb547" stroke-width="1.6"/>
+  <text x="46" y="206" fill="#ffb547" font-size="12.5" font-family="Consolas">src/core/  ◂ SHARED SIM</text>
+  <text x="46" y="223" fill="#c2d3e0" font-size="10.5" font-family="Segoe UI">grid · player · tail (RLE) · stack</text>
+  <text x="46" y="238" fill="#c2d3e0" font-size="10.5" font-family="Segoe UI">move · fillTail · floodFill · all collisions</text>
+  <text x="46" y="256" fill="#8ba3b8" font-size="10.5" font-family="Segoe UI">runs identically on every machine</text>
+
+  <rect x="32" y="280" width="298" height="76" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="46" y="300" fill="#e8f1f8" font-size="12.5" font-family="Consolas">src/mode/player.js</text>
+  <text x="46" y="317" fill="#5f7688" font-size="10.5" font-family="Segoe UI">Canvas 2D · viewport culling · drop-shadow grid</text>
+  <text x="46" y="332" fill="#5f7688" font-size="10.5" font-family="Segoe UI">HUD: % · kills · rank · top-5 rolling bars</text>
+  <text x="46" y="347" fill="#5f7688" font-size="10.5" font-family="Segoe UI">zoom = 1/(portion+1) · double-buffered</text>
+
+  <!-- SERVER -->
+  <rect x="554" y="40" width="330" height="330" rx="10" fill="#0c1826" stroke="#1c3044"/>
+  <text x="568" y="62" fill="#8ba3b8" font-size="11" letter-spacing="3" font-family="Segoe UI">SERVER  ·  node</text>
+
+  <rect x="570" y="76" width="298" height="42" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="584" y="94" fill="#e8f1f8" font-size="12.5" font-family="Consolas">server.js</text>
+  <text x="584" y="110" fill="#5f7688" font-size="10.5" font-family="Segoe UI">mimi-server + Socket.IO · setInterval(1000/60)</text>
+
+  <rect x="570" y="126" width="298" height="52" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="584" y="145" fill="#e8f1f8" font-size="12.5" font-family="Consolas">src/game-server.js</text>
+  <text x="584" y="161" fill="#5f7688" font-size="10.5" font-family="Segoe UI">players[] · join/leave · colour pool</text>
+  <text x="584" y="174" fill="#5f7688" font-size="10.5" font-family="Segoe UI">grid → Uint8Array(10000) snapshot · heading authority</text>
+
+  <rect x="570" y="186" width="298" height="86" rx="6" fill="#12212f" stroke="#ffb547" stroke-width="1.6"/>
+  <text x="584" y="206" fill="#ffb547" font-size="12.5" font-family="Consolas">src/core/  ◂ THE SAME FILES</text>
+  <text x="584" y="223" fill="#c2d3e0" font-size="10.5" font-family="Segoe UI">identical imports, identical files</text>
+  <text x="584" y="238" fill="#c2d3e0" font-size="10.5" font-family="Segoe UI">no server AI · no bot logic lives here</text>
+  <text x="584" y="256" fill="#8ba3b8" font-size="10.5" font-family="Segoe UI">authority exists but is thin</text>
+
+  <rect x="570" y="280" width="298" height="76" rx="6" fill="#101f2e" stroke="#1c3044"/>
+  <text x="584" y="300" fill="#e8f1f8" font-size="12.5" font-family="Consolas">DEAD CODE</text>
+  <text x="584" y="317" fill="#f4515e" font-size="10.5" font-family="Segoe UI">verifyPlayerLocations() — never called</text>
+  <text x="584" y="332" fill="#f4515e" font-size="10.5" font-family="Segoe UI">notifyKill — never passed → kill() is a no-op</text>
+  <text x="584" y="347" fill="#5f7688" font-size="10.5" font-family="Segoe UI">positions are never actually verified</text>
+
+  <!-- shared link -->
+  <line x1="346" y1="229" x2="548" y2="229" stroke="#ffb547" stroke-width="1.4" stroke-dasharray="5 4"/>
+  <text x="447" y="220" fill="#ffb547" font-size="10" text-anchor="middle" font-family="Segoe UI">one simulation, two runtimes</text>
+
+  <!-- arrows -->
+  <line x1="404" y1="140" x2="504" y2="140" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="454" y="133" fill="#4fc3f7" font-size="9.5" text-anchor="middle" font-family="Segoe UI">hello / frame</text>
+  <line x1="504" y1="300" x2="404" y2="300" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="454" y="293" fill="#4fc3f7" font-size="9.5" text-anchor="middle" font-family="Segoe UI">notifyFrame</text>
+
+  <!-- BOTS -->
+  <rect x="16" y="396" width="868" height="88" rx="10" fill="#0c1826" stroke="#1c3044"/>
+  <text x="30" y="418" fill="#8ba3b8" font-size="11" letter-spacing="3" font-family="Segoe UI">BOTS  ·  N separate OS processes, forked by server.js</text>
+  <rect x="32" y="428" width="404" height="44" rx="6" fill="#101f2e" stroke="#5ddc9a"/>
+  <text x="46" y="447" fill="#5ddc9a" font-size="12" font-family="Consolas">paper-io-bot.js  ✔ the one that runs</text>
+  <text x="46" y="463" fill="#5f7688" font-size="10.5" font-family="Segoe UI">imports the SAME game-client.js + core, connects as a normal client</text>
+  <rect x="464" y="428" width="404" height="44" rx="6" fill="#101f2e" stroke="#f4515e"/>
+  <text x="478" y="447" fill="#f4515e" font-size="12" font-family="Consolas">bot.js  ✖ genetic variant — dead</text>
+  <text x="478" y="463" fill="#5f7688" font-size="10.5" font-family="Segoe UI">assigns steps / distWeights undeclared → ReferenceError in ESM</text>
+  <line x1="450" y1="450" x2="508" y2="450" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+</svg>
+<figcaption>Architecture — one shared deterministic simulation, run on both ends. The server is an authority over <em>inputs</em> and <em>membership</em>, not over positions.</figcaption>
+</figure>
+
+<h3>Map representation</h3>
+<p><code>Grid</code> (<span class="file">src/core/grid.js</span>) is a <strong>sparse two-dimensional JavaScript array of object references</strong> — each cell holds a <code>Player</code> instance or <code>null</code>. No IDs, no bitsets, no packed integers. A change callback fires on every write, which is how the client derives percentages and queues animations.</p>
+<ul>
+  <li>100 × 100 = 10,000 cells · 40px each · a 4000 × 4000px world</li>
+  <li>Player spawns stamp a <strong>3×3 block</strong> via <code>initPlayer</code> (<span class="file">core/index.js:6</span>)</li>
+  <li>Spawn selection (<code>findEmpty</code>) picks a <strong>uniformly random</strong> empty 3×3 anywhere on the map — no clustering, so the board fills from all directions at once</li>
+  <li>Wire format is a <code>Uint8Array(10000)</code> of 1-based player indices, so only 64 players could ever be encoded</li>
+</ul>
+
+<h3>Territory ownership</h3>
+<p>Ownership <em>is</em> the grid cell value. There is no separate territory structure, no region list, no shape representation. Consequences:</p>
+<ul>
+  <li><strong>Percentage is free.</strong> The client keeps <code>playerPortion[num]</code> by incrementing on every <code>set</code> — O(1) per cell, no scanning.</li>
+  <li><strong>Death is O(map).</strong> Clearing a dead player's land is a full 10,000-cell sweep (<span class="file">core/index.js:94</span>). Fine at 30 players.</li>
+  <li><strong>Memory is unbounded by player count</strong> in principle, but a JS object reference per cell is heavy for WebGL porting — TIDE should use a flat id array instead.</li>
+</ul>
+
+<h3>Trail system — the best engineering in the repository</h3>
+<div class="panel">
+  <p>The trail is stored <strong>twice</strong>, each representation chosen for a different job:</p>
+  <div class="grid2" style="margin-top:4px">
+    <div>
+      <h4>For storage &amp; drawing: run-length encoding</h4>
+      <p style="margin-bottom:0">An array of <code>{orientation, move}</code> segments (<span class="file">player.js:32-105</span>). A 400-cell trail around a big territory is maybe 12 segments. Cost is O(segments), not O(cells) — and <code>renderTail</code> draws each segment as one <code>fillRect</code> plus corner triangles.</p>
+    </div>
+    <div>
+      <h4>For collision: sparse boolean grid</h4>
+      <p style="margin-bottom:0">A 2D array of <code>true</code> written as the tail grows (<code>tailGrid</code>). <code>hitsTail</code> is therefore <strong>O(1)</strong> — a single array lookup, no iteration over segments. With 30 players the O(n²) pair loop costs nothing.</p>
+    </div>
+  </div>
+  <p style="margin-bottom:0;margin-top:14px">This dual representation is why the codebase has no performance problem in trail handling at all. <strong>TIDE should copy this exactly.</strong> Note the one asymmetry: <code>reposition</code> resets the tail, and the previous segment array is returned but discarded.</p>
+</div>
+
+<h3>Area capture algorithm</h3>
+<p>Two functions, and the interaction between them is the elegant part. Fires from <code>move()</code> the moment the player's centre enters a cell it owns.</p>
+
+<pre style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:18px 20px;overflow-x:auto;font-family:Consolas,monospace;font-size:12px;color:#9fc4d8;line-height:1.55;margin:16px 0">
+<span style="color:#6f8296">// fillTail — BFS across every cell the trail touches</span>
+been = new Grid(size)
+coords.push(start)
+<span style="color:#6f8296">while</span> coords.length:
+    coord = coords.shift()
+    <span style="color:#6f8296">if</span> oob(coord) || been(coord): <span style="color:#4a6273">continue</span>
+    <span style="color:#6a8ba0">if</span> onTail(coord):
+        been(coord) = <span style="color:#ffb547">true</span>
+        grid(coord)  = player          <span style="color:#6f8296">← the trail itself is captured too</span>
+        floodFill(r+1,c) floodFill(r-1,c) <span style="color:#6f8296">← 4 neighbours per tail cell</span>
+        floodFill(r,c+1) floodFill(r,c-1)
+
+<span style="color:#6f8296">// floodFill — expand until blocked; abort capture if it escapes</span>
+surrounded = <span style="color:#ffb547">true</span>
+<span style="color:#6f8296">while</span> coords.length:
+    <span style="color:#6a8ba0">if</span> oob(coord):  surrounded = <span style="color:#f4515e">false</span>; <span style="color:#6a8ba0">continue</span>   <span style="color:#6f8296">← leaks to the map edge → NO capture</span>
+    <span style="color:#6a8ba0">if</span> been(coord) || onTail(coord) || grid(coord)==player: <span style="color:#4a6273">continue</span>
+    been(coord) = <span style="color:#ffb547">true</span>
+    <span style="color:#6a8ba0">if</span> (surrounded) filled.push(coord)     <span style="color:#6f8296">← Stack preallocated to 10001</span>
+    <span style="color:#6f8296">push</span> 4 neighbours
+<span style="color:#6a8ba0">if</span> (surrounded) <span style="color:#6a8ba0">while</span> (filled.pop) grid(c) = player
+</pre>
+
+<div class="flag ok">
+  <span class="lbl">The trick worth stealing</span>
+  <p>A single <code>been</code> grid is shared across <em>all</em> flood fills in one capture. This means the first flood that escapes to the map edge marks the entire outside region as <code>been</code>, so every subsequent flood correctly identifies only the enclosed interior. <strong>No "am I inside or outside?" computation is needed</strong> — the exclusion set does the topology for free. It is the cleanest enclosure test I have seen in a .io codebase.</p>
+</div>
+<p>Cost is O(region) on loop closure and zero otherwise. Worst case is the full 10,000 cells. At 30 players this is comfortably real-time.</p>
+
+<h3>Collision detection</h3>
+<p>All of it lives in <code>updateFrame</code> (<span class="file">core/index.js:14-99</span>) as one O(n²) pass. Four distinct rules, and every one is legible to the player:</p>
+<table>
+  <thead><tr><th style="width:30%">Collision</th><th>Resolution</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Out of bounds</strong></td><td>Immediate death. Drawn as a grey border (<code>paintGridBorder</code>), so it is visible before you touch it.</td></tr>
+    <tr><td><strong>Body → someone's tail</strong></td><td>You die. O(1) via <code>tailGrid</code>. The dominant death in the game, and always self-inflicted.</td></tr>
+    <tr><td><strong>Body → body</strong></td><td>AABB overlap of CELL_WIDTH boxes. <em>If i stands on i's own land → j dies.</em> <em>If j is on j's land → i dies.</em> <strong>Otherwise the player with the smaller <code>area(p)</code> loses</strong> — the distance already travelled into the current cell. Equal → both die.</td></tr>
+    <tr><td><strong>Death cleanup</strong></td><td>Every cell owned by a dead player is set to <code>null</code>. Full-board sweep.</td></tr>
+  </tbody>
+</table>
+<p>The <code>area()</code> tiebreak is a genuinely good rule: it is deterministic, it needs no randomness, and it is sub-frame-arbitrary — you lose because you were less committed to the cell you were entering, not because the server rolled a die.</p>
+
+<h3>Bot behaviour</h3>
+<div class="flag warn">
+  <span class="lbl">There is no server-side AI at all</span>
+  <p>Bots are <strong>separate OS processes</strong> forked by <code>server.js</code>, each importing the same <code>game-client.js</code> and connecting over WebSocket exactly like a human. Zero lines of AI in the authoritative process. This is why the demo can be shipped with <code>bots: 5</code> as a single config value.</p>
+</div>
+<p><code>paper-io-bot.js</code> is a deobfuscation of the original Voodoo AI and contains a three-state policy driven by map share, with <code>thres = (.05 + .1 × random()) × 10000</code>:</p>
+<table>
+  <thead><tr><th style="width:24%">State</th><th style="width:22%">Trigger</th><th>Behaviour</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Explore</strong></td><td>Standing on own land</td><td>Raycasts 4 directions × 20 cells. <span class="g">+30×(30−S)</span> toward cells covered by an enemy tail (i.e. steering into a kill), <span class="r">−1</span> per cell that is not already yours, <span class="r">−1</span> toward the edge. Straight = 100, reverse = −9999. Weighted random pick.</td></tr>
+    <tr><td><strong>Claim</strong></td><td>Outside, share &lt; 5–15%</td><td>Executes a <strong>pre-generated random rectangle</strong>: four sides of <code>[breadth, length, breadth+2..3, length]</code>, each 2–6 cells, clockwise or counter-clockwise at random. This is the entire expansion algorithm.</td></tr>
+    <tr><td><strong>Return</strong></td><td>Outside, share ≥ 5–15%</td><td>Same raycast, but <span class="r">−(50−S)</span> for own tail and <span class="g">+(10+S)</span> toward own territory. It homes.</td></tr>
+  </tbody>
+</table>
+<p><strong>The one-line difficulty curve:</strong> a bot changes behaviour at 5–15% map share. That is the whole AI design — small bots expand, large bots survive. It is a serviceable heuristic and it is entirely transparent to the player once you have seen it twice.</p>
+
+<h3>Rendering approach</h3>
+<ul>
+  <li><strong>Canvas 2D</strong>, not WebGL. Full-viewport clear, then a clipped, scaled, translated world pass, then an unscaled HUD pass.</li>
+  <li><strong>Viewport culling</strong> for the static grid pass — only rows/columns intersecting the camera are iterated. The right call.</li>
+  <li><strong>The entire visual identity is 12 lines of code.</strong> <code>SHADOW_OFFSET</code> draws a 5px darker <code>fillRect</code> beneath a cell only when the cell below is unclaimed, faking paper extrusion. That single trick is the whole "paper" look. TIDE should keep an equivalent and exaggerate it.</li>
+  <li><strong>Two grids of animation state.</strong> <code>animateGrid</code> holds per-cell {before, after, frame} so newly claimed cells can drop in with a two-stage bounce (24 frames, bounce points at 8 and 4). Freed cells fade toward a fixed purple.</li>
+  <li><strong>Double buffering.</strong> <code>paintDoubleBuff</code> paints to an offscreen canvas then blits — necessary because the static pass never clears, only overwrites.</li>
+  <li><strong>Rolling interpolation</strong> on every HUD number (24-frame lerp) so percentages and bars glide instead of snapping.</li>
+  <li><strong>No DPR handling.</strong> The canvas is sized in CSS pixels, so it is upscaled and blurry on any high-density display.</li>
+</ul>
+
+<h3>Performance considerations — honest assessment</h3>
+<table>
+  <thead><tr><th style="width:38%">Issue</th><th style="width:12%">Severity</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td><code>Array.shift()</code> in both BFS loops</td><td class="r">HIGH</td><td>Shift on a plain array is O(n). The capture BFS is therefore <strong>O(n²) in the region size</strong> — pathological at 10,000 cells. It has never been a problem only because captures are small and rare. The output buffer correctly uses a preallocated <code>Stack</code>; the <em>queue</em> does not.</td></tr>
+    <tr><td>Full-grid animation sweep per frame</td><td class="r">HIGH</td><td>After the culled static pass, a second loop iterates <strong>all 100 × 100 cells every frame</strong> — 600,000 iterations/sec — purely to advance animation counters.</td></tr>
+    <tr><td>SetInterval as the fixed step</td><td class="a">MED</td><td><code>setInterval(…, 1000/60)</code> drifts and jitters; there is no accumulator. Worse, <code>config.fps</code> is set to 30 and <strong>never referenced anywhere</strong> — dead config.</td></tr>
+    <tr><td>10KB full resync on any dropped frame</td><td class="a">MED</td><td><code>data.frame - 1 !== frame</code> is strict. One lost packet triggers a full player list plus a 10,000-byte grid buffer. No interpolation, so latency is visible stutter. Bandwidth scales with players².</td></tr>
+    <tr><td>3-second hard timeout</td><td class="a">MED</td><td>No frame for 3 seconds → disconnect. The game fails hard on a network hiccup instead of degrading.</td></tr>
+    <tr><td>O(n²) player collision</td><td class="g">LOW</td><td>30 players = 900 pairs per tick. Irrelevant. Would break around 200+.</td></tr>
+    <tr><td>Grid object references</td><td class="g">LOW</td><td>Fine here; a poor fit for a WebGL port where a flat typed array is required anyway.</td></tr>
+  </tbody>
+</table>
+
+<h3>Dead code, bugs and unfinished work — verified by reading</h3>
+<table>
+  <thead><tr><th style="width:34%">Finding</th><th>Evidence and consequence</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Anti-cheat designed, never wired</strong></td><td><code>verifyPlayerLocations()</code> in <span class="file">game-server.js:116</span> keeps 300 frames of position history and validates client claims — and is <strong>never called</strong>. The <code>frame</code> handler validates only the frame number and heading. <strong>Positions are never verified.</strong> Input <em>is</em> validated (<code>checkInt(heading, 0, 4)</code>), so you cannot send an illegal direction — that is the only protection present.</td></tr>
+    <tr><td><strong>No kill attribution</strong></td><td><code>updateFrame</code>'s 4th parameter <code>notifyKill</code> is never passed by the server, so the internal <code>kill()</code> is a no-op function. <strong>The server never tells you who killed you.</strong> The client guesses its own kill count; nobody can attribute a death.</td></tr>
+    <tr><td><strong><code>bot.js</code> is non-functional</strong></td><td>Assigns <code>steps</code> and <code>distWeights</code> without declaration — a <code>ReferenceError</code> under ESM strict mode. <code>generateLandDirections</code> and <code>LAND_CLAIMS</code> are empty stubs. <code>server.js</code> forks <code>paper-io-bot.js</code> instead, so this is masked.</td></tr>
+    <tr><td><strong>Variable leak in the bot AI</strong></td><td><span class="file">paper-io-bot.js:93,164</span> — <code>if (o.name.indexOf("PAPER")…)</code> reads <code>o</code>, the leaked <code>for (var o of others)</code> variable, not <code>tailed</code>. The "don't kill our own kind" heuristic tests the wrong player and is effectively random.</td></tr>
+    <tr><td><strong>Dead UI</strong></td><td><code>#mode</code> and <code>#skins</code> buttons in <span class="file">index.html</span> have no event handlers. The 2.6MB unlicensed Gwent OST plays through a raw <code>&lt;audio controls&gt;</code> element.</td></tr>
+    <tr><td>No tests, no CI</td><td>Zero test files. <code>README</code> warns that <code>config.js</code> must be rebuilt manually after every edit. Three of the six roadmap TODOs are unstarted.</td></tr>
+  </tbody>
+</table>
+
+<figure>
+<svg viewBox="0 0 900 470" role="img" aria-label="Data flow diagram: client and server lanes showing the hello handshake, per-frame heading deltas, occasional full grid resync, and death disconnect">
+  <defs>
+    <marker id="fa" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#4fc3f7"/>
+    </marker>
+    <marker id="fb" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#ffb547"/>
+    </marker>
+  </defs>
+
+  <!-- lanes -->
+  <rect x="40" y="42" width="150" height="404" rx="8" fill="#0c1826" stroke="#1c3044"/>
+  <text x="115" y="66" fill="#8ba3b8" font-size="11" letter-spacing="2.5" text-anchor="middle" font-family="Segoe UI">CLIENT</text>
+  <rect x="710" y="42" width="150" height="404" rx="8" fill="#0c1826" stroke="#1c3044"/>
+  <text x="785" y="66" fill="#8ba3b8" font-size="11" letter-spacing="2.5" text-anchor="middle" font-family="Segoe UI">SERVER</text>
+  <line x1="115" y1="78" x2="115" y2="440" stroke="#1c3044" stroke-dasharray="3 4"/>
+  <line x1="785" y1="78" x2="785" y2="440" stroke="#1c3044" stroke-dasharray="3 4"/>
+
+  <text x="450" y="20" fill="#5f7688" font-size="10.5" text-anchor="middle" font-family="Segoe UI">time ↓</text>
+
+  <!-- 1 hello -->
+  <line x1="115" y1="110" x2="770" y2="110" stroke="#4fc3f7" stroke-width="1.7" marker-end="url(#fa)"/>
+  <text x="440" y="102" fill="#4fc3f7" font-size="11" text-anchor="middle" font-family="Consolas">hello { name, god }</text>
+  <line x1="770" y1="142" x2="115" y2="142" stroke="#4fc3f7" stroke-width="1.7" marker-end="url(#fa)"/>
+  <text x="440" y="134" fill="#4fc3f7" font-size="11" text-anchor="middle" font-family="Segoe UI">ack: success | error message</text>
+  <text x="440" y="158" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Segoe UI">name ≤ 32 chars, MAX_PLAYERS = 30</text>
+
+  <!-- 2 game snapshot on join -->
+  <line x1="770" y1="192" x2="115" y2="192" stroke="#ffb547" stroke-width="2" marker-end="url(#fb)"/>
+  <text x="440" y="184" fill="#ffb547" font-size="11" text-anchor="middle" font-family="Consolas">game { players[], grid: Uint8Array(10000) }</text>
+  <text x="440" y="208" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Segoe UI">FULL authoritative state on join — ~10KB+</text>
+
+  <!-- 3 heading -->
+  <line x1="115" y1="248" x2="770" y2="248" stroke="#4fc3f7" stroke-width="1.7" marker-end="url(#fa)"/>
+  <text x="440" y="240" fill="#4fc3f7" font-size="11" text-anchor="middle" font-family="Consolas">frame { frame, heading }</text>
+  <text x="440" y="264" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Segoe UI">sent on every turn only · heading range-validated</text>
+  <text x="440" y="278" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Segoe UI">client-side reversals rejected before sending</text>
+
+  <!-- 4 notifyFrame -->
+  <line x1="770" y1="318" x2="115" y2="318" stroke="#4fc3f7" stroke-width="2.4" marker-end="url(#fa)"/>
+  <text x="440" y="310" fill="#4fc3f7" font-size="11" text-anchor="middle" font-family="Consolas">notifyFrame { frame, moves[{num, left, heading}] }</text>
+  <text x="440" y="334" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Segoe UI">~60×/sec to every client · headings only · a few dozen bytes</text>
+  <text x="440" y="350" fill="#8ba3b8" font-size="10.5" text-anchor="middle" font-family="Segoe UI">both ends run core/ locally — the client simulates every other player</text>
+
+  <!-- 5 resync -->
+  <rect x="150" y="366" width="600" height="52" rx="6" fill="#1d1116" stroke="#5a2a2f"/>
+  <line x1="115" y1="378" x2="770" y2="378" stroke="#f4515e" stroke-width="1.7" marker-end="url(#fa)"/>
+  <text x="440" y="374" fill="#f4515e" font-size="11" text-anchor="middle" font-family="Consolas">requestFrame</text>
+  <line x1="770" y1="404" x2="115" y2="404" stroke="#ffb547" stroke-width="2" marker-end="url(#fb)"/>
+  <text x="440" y="400" fill="#ffb547" font-size="11" text-anchor="middle" font-family="Consolas">game { full state again }</text>
+  <text x="785" y="430" fill="#f4515e" font-size="10" text-anchor="end" font-family="Segoe UI">triggered by a single</text>
+  <text x="785" y="442" fill="#f4515e" font-size="10" text-anchor="end" font-family="Segoe UI">dropped frame</text>
+
+  <!-- death -->
+  <text x="440" y="462" fill="#f4515e" font-size="11" text-anchor="middle" font-family="Consolas">dead → server disconnect()s the socket → "Play Again" button → rejoin</text>
+</svg>
+<figcaption>Data flow — an extremely bandwidth-efficient design. Per-frame traffic is heading-only; the expensive full-state snapshot is reserved for join and desync. The cost is fragility: correctness depends on both machines running bit-identical deterministic code.</figcaption>
+</figure>
+
+<div class="flag note">
+  <span class="lbl">The hidden bargain in the netcode</span>
+  <p>Lockstep simulation is brilliant here because there are <strong>no random decisions in the simulation</strong>. Randomness is confined to spawn heading and colours on the server, and is stripped before serialisation. TIDE must preserve this: <strong>the moment you put a random or float-drift element in the shared core, every client desyncs on a schedule.</strong> Any randomness in TIDE's simulation must live on the server and be transmitted.</p>
+</div>
+
+<!-- ============ PART 4 ============ -->
+<h2><span class="n">04</span> Part 4 — Player flow</h2>
+
+<figure>
+<svg viewBox="0 0 900 300" role="img" aria-label="Player flow: launch, name entry, connectivity probe, join, one second freeze, play loop, death, play again, back to menu">
+  <defs>
+    <marker id="fc" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#4fc3f7"/>
+    </marker>
+  </defs>
+
+  <rect x="14" y="30" width="104" height="46" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="66" y="50" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">Launch</text>
+  <text x="66" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">page load</text>
+
+  <rect x="150" y="30" width="120" height="46" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="210" y="50" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">Enter name</text>
+  <text x="210" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">identity first</text>
+
+  <rect x="302" y="30" width="132" height="46" rx="7" fill="#12212f" stroke="#4fc3f7"/>
+  <text x="368" y="50" fill="#4fc3f7" font-size="11.5" text-anchor="middle" font-family="Segoe UI">pings → pongs</text>
+  <text x="368" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">enables Play button</text>
+
+  <rect x="466" y="30" width="112" height="46" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="522" y="50" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">Join</text>
+  <text x="522" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">random empty 3×3</text>
+
+  <rect x="610" y="30" width="118" height="46" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="669" y="50" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">1s freeze</text>
+  <text x="669" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">NEW_PLAYER_LAG</text>
+
+  <rect x="760" y="30" width="126" height="46" rx="7" fill="#0e1f18" stroke="#5ddc9a"/>
+  <text x="823" y="50" fill="#5ddc9a" font-size="11.5" text-anchor="middle" font-family="Segoe UI">PLAY</text>
+  <text x="823" y="66" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">until death</text>
+
+  <line x1="118" y1="53" x2="146" y2="53" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="270" y1="53" x2="298" y2="53" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="434" y1="53" x2="462" y2="53" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="578" y1="53" x2="606" y2="53" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="728" y1="53" x2="756" y2="53" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+
+  <text x="450" y="26" fill="#5f7688" font-size="10" text-anchor="middle" font-family="Consolas">no queue · no loading · no countdown · no round</text>
+
+  <!-- death branch -->
+  <rect x="660" y="150" width="150" height="52" rx="7" fill="#1c1116" stroke="#f4515e"/>
+  <text x="735" y="170" fill="#f4515e" font-size="12" text-anchor="middle" font-family="Segoe UI">DEATH</text>
+  <text x="735" y="187" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">100% of land erased</text>
+
+  <rect x="400" y="150" width="150" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="475" y="170" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">wasted screen</text>
+  <text x="475" y="187" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">60 frames, ~1s</text>
+
+  <rect x="150" y="150" width="150" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="225" y="170" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">Play Again / Menu</text>
+  <text x="225" y="187" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">one click to rejoin</text>
+
+  <rect x="14" y="150" width="106" height="52" rx="7" fill="#101f2e" stroke="#1c3044"/>
+  <text x="67" y="170" fill="#e8f1f8" font-size="11.5" text-anchor="middle" font-family="Segoe UI">name screen</text>
+  <text x="67" y="187" fill="#5f7688" font-size="9.5" text-anchor="middle" font-family="Segoe UI">re-enter</text>
+
+  <line x1="823" y1="76" x2="823" y2="146" stroke="#f4515e" stroke-width="1.8" marker-end="url(#fc)"/>
+  <line x1="660" y1="176" x2="556" y2="176" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="400" y1="176" x2="306" y2="176" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <line x1="150" y1="176" x2="124" y2="176" stroke="#4fc3f7" stroke-width="1.6" marker-end="url(#fc)"/>
+  <path d="M67,146 L67,120 L140,120" stroke="#4fc3f7" stroke-width="1.6" fill="none" marker-end="url(#fc)"/>
+
+  <!-- feedback loop annotations -->
+  <rect x="150" y="238" width="700" height="46" rx="7" fill="#12212f" stroke="#ffb547"/>
+  <text x="164" y="257" fill="#ffb547" font-size="10.5" letter-spacing="1.5" font-family="Segoe UI">THE CENTRAL FEEDBACK LOOP</text>
+  <text x="164" y="274" fill="#c2d3e0" font-size="11" font-family="Segoe UI">death erases land → land returns to neutral → the map visibly reopens for everyone → the loss reads as opportunity for the survivors</text>
+</svg>
+<figcaption>Player flow — there is no end state. The loop's only exit is the death screen, and the punishment buffer is the 3–5 seconds of downtime before you can rejoin.</figcaption>
+</figure>
+
+<h3>Every feedback loop in the system</h3>
+<table>
+  <thead><tr><th style="width:32%">Loop</th><th>Path and latency</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Input → number</strong></td><td>heading → 8 ticks to a cell centre → capture → <code>playerPortion</code> ±1 → 24-frame rolling lerp. <strong>~0.4s.</strong> This is the tightest and most important loop in the game; everything else is decoration on top of it.</td></tr>
+    <tr><td><strong>Growth → camera → information</strong></td><td><code>zoom = 1/(portion+1)</code>. Owning more map literally shows you more map. <strong>Positive feedback that self-balances</strong> — a leader sees everything, a beginner sees a fifth of the board.</td></tr>
+    <tr><td><strong>Growth → rank → target selection → aggression</strong></td><td>The leaderboard normalises all bars to rank 1, so the leader's number is always a moving target in your face. Falling behind raises risk appetite without any code.</td></tr>
+    <tr><td><strong>Death → neutral map → opportunity</strong></td><td>The dominant macro loop. Entirely emergent, entirely free, and the source of the genre's best moments.</td></tr>
+    <tr><td><strong>Kills → status → risk tolerance</strong></td><td>A kill is scored on a separate axis from area, so it validates a playstyle that pure expansion would not. Bots weight enemy tails at <span class="g">+30×(30−S)</span> — they hunt too.</td></tr>
+    <tr><td><strong>Spawn randomness → population spread</strong></td><td><code>findEmpty</code> picks uniformly at random, so no two rounds have the same geography and the board fills from every direction. Emergent variety with zero content cost.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ PART 5 ============ -->
+<h2><span class="n">05</span> Part 5 — Retention</h2>
+
+<h3>Why they play one match</h3>
+<p><strong>Instant, continuous, unambiguous feedback.</strong> A number moves the instant you act, at 0.4s latency, and it is the only number that matters. Plus the identity hook: a name, ranked, against strangers, within two seconds of load.</p>
+
+<h3>Why they play five matches</h3>
+<ul>
+  <li><strong>A real opponent appears.</strong> The leaderboard converts an abstract scoreboard into a person. Rank 1 is a target, not a concept.</li>
+  <li><strong>The skill starts to show.</strong> Around the third match, players notice their territories are ribbons rather than squares and start doing it deliberately. Competence is visible and it is their own.</li>
+  <li><strong>Death is cheap enough to gamble on.</strong> One click back, nothing lost but the run.</li>
+</ul>
+
+<h3>Why they play twenty matches</h3>
+<div class="flag kill">
+  <span class="lbl">They mostly don't. And that is the opening.</span>
+  <p>There is <strong>no progression of any kind</strong>. No unlocks, no records, no history, no meta, no currency, no daily anything. Nothing persists between sessions. After ~20 matches a player has nothing new to chase except their own spatial intuition — and <strong>mastery here is entirely invisible.</strong> You cannot see that you improved. There is no before-and-after, no trend line, no personal best, nothing.</p>
+  <p style="margin-top:10px">The honest conclusion: Paper.io is an excellent five-minute toy and a poor twenty-match game. <strong>That gap is the single most valuable thing this analysis produces for TIDE</strong>, and it is a far cheaper target than the tide mechanic I originally proposed.</p>
+</div>
+
+<h3>What creates addiction, and what creates mastery</h3>
+<div class="grid2">
+  <div class="panel" style="margin:0">
+    <h4>Addiction engine (variance + comparison)</h4>
+    <ul style="margin-bottom:0">
+      <li>The <strong>rolling % counter</strong> — slot-machine-shaped, free, and constant.</li>
+      <li><strong>Loss of everything on death</strong> — high variance, high arousal.</li>
+      <li><strong>The zoom-out</strong> — visible proof of progress, felt as power.</li>
+      <li><strong>The leaderboard bars</strong> — pure social comparison.</li>
+      <li>None of these teach anything. They make you play again today.</li>
+    </ul>
+  </div>
+  <div class="panel" style="margin:0">
+    <h4>Mastery engine (spatial, invisible)</h4>
+    <ul style="margin-bottom:0">
+      <li><strong>Contour routing</strong> — hugging your own border to minimise exposure.</li>
+      <li><strong>Rectangle proportioning</strong> — long and thin beats square and fat.</li>
+      <li><strong>Baiting</strong> — drawing a lure in front of a chaser and turning away.</li>
+      <li><strong>Safe-zone denial</strong> — knowing you cannot be killed on your own land, and using that offensively.</li>
+      <li>All of these are teachable by observation and none of them are taught by the game.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ PART 6 ============ -->
+<h2><span class="n">06</span> Part 6 — Weaknesses</h2>
+
+<h4>Design</h4>
+<table>
+  <thead><tr><th style="width:34%">Weakness</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td><strong>No game</strong></td><td>No timer, no end, no result, no victory. A session has no shape and no exit. This is the single largest design gap and it costs almost nothing to fix.</td></tr>
+    <tr><td><strong>Optimal play is degenerate</strong></td><td>Get to ~15%, then turtle. The skill ceiling is route optimisation and nothing else. There is never a reason to take a risk once you are safe, so the late game is a waiting game.</td></tr>
+    <tr><td><strong>Death erases everything</strong></td><td>Brutal swing for a new player. Your first big run ends and you lose 100% of it, with no partial credit and no history.</td></tr>
+    <tr><td><strong>No comeback path</strong></td><td>Trailing players have no mechanism to return other than luck. The map opening up is not a plan.</td></tr>
+    <tr><td><strong>Bots are one policy</strong></td><td>A single weighted raycast with a size threshold. Predictable to the point of invisibility, and exploitable the moment you notice they only hunt enemy tails from inside their own land.</td></tr>
+    <tr><td><strong>Runs out of game</strong></td><td>Once neutral space is gone there is no phase two. The genre's endgame problem, unsolved.</td></tr>
+    <tr><td><strong>Nothing persists</strong></td><td>No records, no history, no progression. Mastery is invisible and therefore unrewarding over time.</td></tr>
+  </tbody>
+</table>
+
+<h4>Technical</h4>
+<ul>
+  <li><strong><code>config.fps</code> is dead</strong> — set to 30, never referenced. The server runs at 60.</li>
+  <li><strong><code>setInterval</code> instead of a fixed-step accumulator</strong> — drift and jitter in the authoritative loop.</li>
+  <li><strong>O(n²) BFS</strong> from <code>Array.shift()</code> in both capture loops.</li>
+  <li><strong>Full 100×100 sweep every frame</strong> for animation counters, after the culled static pass.</li>
+  <li><strong>No interpolation</strong> — entities are simulated, never interpolated, so latency reads as stutter.</li>
+  <li><strong>Full 10KB resync on one dropped packet</strong>, with strict frame matching.</li>
+  <li><strong>3-second hard timeout</strong> ends the session on a network hiccup instead of degrading.</li>
+  <li><strong>Anti-cheat is dead code.</strong> Positions are never verified. Only input legality is checked.</li>
+  <li><strong>No kill attribution.</strong> The server never tells you who killed you — the most satisfying missing feedback in the entire genre.</li>
+  <li><strong><code>bot.js</code> is broken</strong> and masked by forking a different file.</li>
+  <li><strong>Leaked loop variable</strong> in the active bot's kill heuristic.</li>
+  <li><strong>Zero tests, no CI</strong>, and a README warning that config changes require a manual rebuild.</li>
+</ul>
+
+<h4>Scaling</h4>
+<ul>
+  <li><strong>One world, one room, 30 players.</strong> Multiple rooms is an open TODO and is a hard requirement, not an optimisation.</li>
+  <li><strong>10,000 cells is fixed and shared.</strong> Bandwidth scales with players² because each snapshot is O(cells).</li>
+  <li><strong>The endgame is fragmentation.</strong> Uniform random spawning means the last neutral pockets are scattered scraps that force unwinnable scrum fights.</li>
+  <li><strong>O(n²) collision</strong> is irrelevant at 30 and breaks somewhere past 200.</li>
+  <li><strong>Sim running on every client</strong> means CPU cost scales with client count, not player count. A 10,000-player deployment pays 10,000 simulations to host 10,000 players.</li>
+</ul>
+
+<h4>Mobile</h4>
+<ul>
+  <li><strong>Swipe resolves on <code>touchend</code>.</strong> Input latency equals the duration of your swipe. Holding your finger down does nothing. This is a serious feel defect and it is the single most important mobile fix.</li>
+  <li><strong>No DPR handling</strong> — canvas sized in CSS pixels, upscaled and blurry on every modern phone.</li>
+  <li><strong>Full-viewport offscreen repaint every frame</strong> in Canvas 2D — heavy on low-end hardware.</li>
+  <li><strong>Growing zoom-out shrinks your territory</strong> on an already small screen.</li>
+  <li><strong><code>touchmove</code> is globally <code>preventDefault</code>-ed</strong>, which interferes with page-level gestures.</li>
+  <li>No virtual stick, no control remap, no quality setting, no haptics.</li>
+</ul>
+
+<h4>UX</h4>
+<ul>
+  <li><strong>Instructions live in an <code>alert()</code></strong> behind a settings gear — deliberately hidden. The game relies entirely on emergent teaching, which works, but leaves the 5% who need it with nothing.</li>
+  <li><strong>No sound design.</strong> A 2.6MB unlicensed Gwent soundtrack in a raw <code>&lt;audio controls&gt;</code> tag. Territory capture is the most satisfying possible sound in the genre and it is completely unused.</li>
+  <li><strong>Dead "Mode" and "Skins" buttons</strong> on the main menu.</li>
+  <li><strong>Spectator mode is a primary button</strong> next to Play — it will attract the wrong audience.</li>
+  <li><strong>Name is never persisted.</strong> Re-typed every session.</li>
+  <li><strong>No colourblind consideration</strong>, though the palette discipline (<code>L = 0.5</code> fixed, hues restricted to 0–220, three saturations, 81 colours, shuffled, recycled on death) is a strong foundation to build on.</li>
+  <li><strong>Early game isolation.</strong> At zoom 0.9 you see roughly a fifth of the map, so for the first minute a player may never see another human.</li>
+</ul>
+
+<!-- ============ PART 7 ============ -->
+<h2><span class="n">07</span> Part 7 — TIDE opportunities</h2>
+
+<div class="seclist keep">
+  <div class="seclabel">What I would KEEP for TIDE — copy the idea, not the code</div>
+  <ol>
+    <li><b>Run-length trail + sparse collision grid (<code>player.js</code>).</b> Two representations, each optimal for its job. The best engineering decision in the repository and I would port it verbatim.</li>
+    <li><b>Turn-only-on-cell-boundary with buffered input.</b> Input is latched into <code>tmpHeading</code> and applied at the next cell line. This one rule is the entire reason Paper.io feels crisp, and it is the first thing that dies if TIDE introduces smooth water physics. <b>Non-negotiable.</b></li>
+    <li><b>The shared deterministic core.</b> One simulation imported by every runtime. It halved the networking cost and it made headless bots trivial.</li>
+    <li><b>The safe-zone collision rule</b> — a bigger player who runs into you on your own land dies. The single best rule in the game, and the reason a large territory feels defensible.</li>
+    <li><b><code>area(player)</code> as the body-collision tiebreak.</b> Deterministic, no randomness, and sub-frame-arbitrary. Fairness you can feel but not explain.</li>
+    <li><b><code>zoom = 1/(portion + 1)</code>.</b> Growth as camera pull-back. Six characters of code that make success feel like power.</li>
+    <li><b>Rolling HUD interpolation</b> and the <strong>top-5 normalised bars</strong>. Comparison is the engine.</li>
+    <li><b>Percentage as the readout, to three decimals.</b> Continuous, always-moving, instantly readable.</li>
+    <li><b>The <code>SHADOW_OFFSET</code> extrusion.</b> Twelve lines of code produce the entire visual identity. Keep the trick, exaggerate the offset, and it becomes TIDE's look too.</li>
+    <li><b>The palette discipline.</b> Fixed lightness, hues restricted to 0–220 to avoid the indistinguishable blue/purple band, three saturations, shuffled and recycled on death. Free legibility, zero art cost.</li>
+    <li><b><code>NEW_PLAYER_LAG</code> spawn protection.</b> One second of stillness. Cheap insurance against the worst possible first experience.</li>
+    <li><b>The <code>pings</code>/<code>pongs</code> connectivity gate.</b> Enabling Play only after a successful round-trip. Invisible, correct, five lines.</li>
+  </ol>
+</div>
+
+<div class="seclist imp">
+  <div class="seclabel">What I would IMPROVE for TIDE</div>
+  <ol>
+    <li><b>Add the match structure this clone lacks.</b> Three minutes, then a result screen. Highest value per line of code in this entire document. The clone has no round and no ending, and TIDE should have both from day one.</li>
+    <li><b>Instant respawn, no menu click.</b> The death screen should cost one keypress. The downtime currently substitutes for a punishment that is already at maximum — make the loop tighter, not the punishment softer.</li>
+    <li><b>Kill attribution.</b> Name the killer and highlight the trail that killed you. The server cannot even do this today (<code>notifyKill</code> is a no-op). It is the most satisfying missing feedback in the genre and it is free once the server knows who hit you.</li>
+    <li><b>Real anti-cheat.</b> Server-authoritative positions. The existing <code>verifyPlayerLocations</code> is correct in design and simply was never called — port the idea, wire it up.</li>
+    <li><b>Delta territory updates + entity interpolation.</b> Replace full 10KB resyncs with per-region deltas, and interpolate remote entities so latency stops reading as stutter. Also raise the 3-second timeout to a degrade, not a kill.</li>
+    <li><b>Fix mobile input latency.</b> Sample steering at the frame boundary — a virtual stick or continuous drag — instead of resolving on <code>touchend</code>. This is a one-day fix with a larger perceived-quality effect than any art pass.</li>
+    <li><b>Bots with genuinely distinct strategies</b> — expander, ambusher, farmer, opportunist — rather than one weighted raycast with a size threshold. Bots must be <em>beatable-looking</em>: they should visibly commit to a mistake you could have predicted.</li>
+    <li><b>Sound.</b> Paper.io has none. Territory capture, being cut off, and losing everything are three sounds that would carry more game feel than any visual improvement available at this budget.</li>
+    <li><b>Persistence and visible mastery.</b> Best area, rounds survived, a personal-best trend. The analysis is unambiguous that mastery here is currently invisible, which is why the game has no twenty-match retention.</li>
+    <li><b>Shrink the world, or shrink the early camera.</b> At 4000×4000 with a fifth-of-map view, new players spend their first minute alone. Either a smaller board or a wider default zoom brings the social layer forward, and the social layer is the whole point of .io.</li>
+    <li><b>Multiple rooms.</b> Not an optimisation — a requirement before any public launch.</li>
+  </ol>
+</div>
+
+<div class="seclist repl">
+  <div class="seclabel">What I would COMPLETELY REPLACE for TIDE</div>
+  <ol>
+    <li><b>The infinite unending world → a timed round with a clean reset.</b> This is the clone's worst design decision and TIDE should invert it in the first prototype.</li>
+    <li><b>Zero-maintenance territory → a holding cost the player chooses to pay.</b> This is the real TIDE thesis, and the analysis refines it sharply: <b>make the cost player-paid, not clock-paid.</b> Territory that cools unless you return to re-heat it (FORGE) keeps every virtue of the expansion loop and adds a genuine second decision — but it costs <em>you</em> movement that you spent on <em>you</em>, it is fully traceable to your own choice, and it never steals anything while you are dead. A global tide does all three of those things wrong.</li>
+    <li><b>The global tide clock → static bathymetry.</b> This is the pivot I am recommending, and it keeps the name. Keep depth-based passability — shallow reef flats are impassable, deep channels are always open — but make it a <b>fixed map property, not a cycle.</b> It changes <em>where</em> you can go rather than <em>when</em> you must. It adds route variety and spatial richness, it gives the map a genuine silhouette and a real screenshot, it never synchronises players into a schedule, it never passively removes land, and it costs exactly one extra array. TIDE becomes a game about <b>navigating and exploiting a bathymetric map</b> rather than about timing a flood — and that is a strategy, not a schedule.</li>
+    <li><b>Whole-map raycast bots → bounded, readable AI</b> with a hard lookahead and named intents, so their mistakes are legible.</li>
+    <li><b>The hidden <code>alert()</code> tutorial → the first 15 seconds teach by design.</b> The % counter is an excellent teacher; give it companions.</li>
+    <li><b>The leaderboard bar as the only sense of other players → map presence.</b> Other players should be a thing you can see and read, not a bar you glance at.</li>
+    <li><b>Canvas 2D → WebGL.</b> TIDE needs animated water and per-region dirty redraws; a rasteriser is the wrong substrate. (The grid should become a flat typed array on the way in — no object references.)</li>
+    <li><b>The dodge-the-walls verb → keep it, but make the wall a decision.</b> One control, four directions, buffered turns. Unchanged. The moment TIDE adds a second control it has lost the thing that makes the genre work.</li>
+  </ol>
+</div>
+
+<!-- ============ VERDICT ============ -->
+<h2><span class="n">08</span> Verdict on the original TIDE concept</h2>
+
+<div class="flag kill">
+  <span class="lbl">This analysis does not support TIDE as originally proposed</span>
+  <p>Four findings from the source, in order of damage:</p>
+</div>
+
+<table>
+  <thead><tr><th style="width:4%">#</th><th style="width:30%">Finding</th><th>Consequence for the tide</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Death already erases 100% of your territory.</strong></td><td>The punishment in this genre is already at absolute maximum. TIDE's passive erosion stacks a second, unearned loss on top of it. Players will experience the tide not as pressure but as <strong>the game taking land twice</strong>, and they will blame it. Erosion cannot be a mechanic here because there is no headroom beneath it.</td></tr>
+    <tr><td>2</td><td><strong>Zero-maintenance territory is load-bearing, not missing.</strong></td><td>Permanent assets with no upkeep are what make the resource satisfying and greed correct. Convert it to a depreciating asset and you have not deepened the game — you have changed what the resource <em>is</em>, and the clean risk/reward tension becomes a relationship with a timer.</td></tr>
+    <tr><td>3</td><td><strong>The game has no time dimension at all, and does not need one.</strong></td><td>Every decision is spatial, and the genre's engagement comes from spatial skill. A <em>global</em> clock additionally phase-aligns every player into a shared schedule, converting emergent outcomes into scripted ones — the exact mechanism that makes .io worth playing. This was already my Phase 0 objection; the source now proves the objection is structural, not stylistic.</td></tr>
+    <tr><td>4</td><td><strong>The clone's real gaps are structural, not decorative.</strong></td><td>No match, no end, no kill attribution, no persistence, no mastery feedback, one room, 30 players. Every one of these is worth more player retention than any environmental gimmick, and all of them are cheaper to build than the tide.</td></tr>
+  </tbody>
+</table>
+
+<div class="flag verdict">
+  <span class="lbl">Recommendation</span>
+  <p><strong>Drop the tide cycle. Keep the bathymetry.</strong></p>
+  <p style="margin-top:10px">TIDE should ship static depth-based passability — shallow flats are land, deep channels are water, and the map's shape is a designed, readable silhouette. That is the whole mechanic, it is one array, it costs nothing to understand, and it produces genuine strategic choice (route through the fast deep channel past two rivals, or the long safe reef) instead of a shared countdown.</p>
+  <p style="margin-top:10px">Layer the second decision on top as a <strong>player-paid holding cost</strong>, not a global one. Then add the three things this codebase demonstrably lacks and Paper.io itself never had: <strong>a three-minute round, kill attribution, and visible mastery progress.</strong></p>
+  <p style="margin-top:10px">That is a smaller, cheaper, clearer game than the one I proposed in Phase 0 — and considerably more likely to survive contact with a real player for five minutes.</p>
+</div>
+
+<h3>Corrections to my own earlier analysis</h3>
+<ul>
+  <li><strong>Wrong:</strong> "Paper.io lets you keep your territory when you death." It does not. Territory is erased to neutral on death, and that mechanic is the most important one in the game.</li>
+  <li><strong>Wrong:</strong> "Players forgive being killed, they never forgive being robbed — so avoid passive erosion." I had the right instinct but the wrong reason. Erosion is not unacceptable because it feels like theft; it is unacceptable because <em>the death penalty is already total</em> and erosion would be a second, unearned loss.</li>
+  <li><strong>Wrong:</strong> "The death screen substitutes for the punishment." Half right. The death screen substitutes for the <em>downtime</em>; nothing substitutes for losing every cell you had.</li>
+  <li><strong>Right, and now evidenced:</strong> the loop has no clock and no decay; the genre's engagement is spatial; a global clock is the wrong place to add depth.</li>
+  <li><strong>New, not previously considered:</strong> the entire session has no end state, and mastery is invisible. These are cheaper to fix than anything I originally proposed, and they address retention directly.</li>
+</ul>
+
+<footer>
+  <b>Reverse-Engineering Review — stevenjoezhang/paper.io.</b> Repository cloned read-only to a temporary directory and analysed at source level. No file in the target repository or in the TIDE project was modified by this review.
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,343 @@
+================================================================================
+        FIVE TERRITORY-CONTROL CONCEPTS
+        BUILT FROM THE PAPER.IO SOURCE ANALYSIS
+================================================================================
+
+  Format note : plain text, English, ASCII tables. No files beyond this one.
+  Basis        : each concept below is DERIVED from a specific verified
+                 Paper.io finding, not brainstormed. The finding it exploits
+                 is named first, every time.
+  Output       : one concept recommended at the end. Not a portfolio.
+
+
+================================================================================
+1.  TIDE (REVISED) -- BATHYMETRY
+================================================================================
+
+  EXPLOITS
+    Superlinear reward in exposure + the fact that contour-following your own
+    frontier is the real skill.
+    The source analysis showed the genuine core skill is tracing your own
+    border to minimise exposure. A map whose shape decides every route makes
+    that skill the entire game.
+
+  CORE MECHANIC
+    A designed archipelago. Shallow reef flats are impassable sand. Deep
+    channels are always open water. You cannot enclose across a sandbank --
+    so THE SHAPE OF THE SEABED DICTATES EVERY ROUTE.
+
+  Resource : Navigable water -- effectively, time-to-bank.
+  Risk     : Routing. Long open crossings and chokepoints between rivals.
+  Reward   : Contiguous, defensible area in a map you chose to fight over.
+
+  WHY IT IS THE STRONGEST
+    The special thing IS the map. Every other concept adds a second system on
+    top of the enclosure loop. This one adds a CONSTRAINT to the terrain.
+    Nothing else to learn.
+
+  KILL-TEST
+    Can a player name a good route within 30 seconds of spawning?
+    If not, the map carries no weight and this collapses.
+
+
+================================================================================
+2.  QUARRY -- THE SCAR
+================================================================================
+
+  EXPLOITS
+    Death erases 100% of territory, which means the map is ALREADY a
+    renewable, decaying resource. The analysis found erasing is the single
+    most consequential thing in the game.
+    Quarry makes YOU the eraser.
+
+  CORE MECHANIC
+    Enclosed ground is claimed AND permanently excavated. The crater is
+    impassable and never comes back.
+
+  Resource : Neutral map -- finite, and you are spending it.
+  Risk     : Attrition. Hoarding map is hoarding your own future options.
+  Reward   : A map progressively denied to your enemies.
+             AGGRESSION BECOMES PROVABLE.
+
+  WHY IT IS MEMORABLE
+    The arena becomes a record of the match. You can point at a crater and
+    say who made it. No .io game has a scar.
+    Craters on a flat plane are the single most screenshot-able territory
+    visual in the genre.
+
+  KILL-TEST
+    Does a 40% player ruin the round for everyone within 60 seconds?
+    If yes, dead.
+    (See the verdict. This is what kills it.)
+
+
+================================================================================
+3.  LATTICE -- CONNECTIVITY
+================================================================================
+
+  EXPLOITS
+    Territory is scored by raw area, so the optimal shape is a boring
+    ribbon, and the genuine contour skill goes unrewarded.
+    Lattice makes TOPOLOGY the constraint instead.
+
+  CORE MECHANIC
+    Territory scores ONLY if it is one connected region.
+    Split it and the smaller piece instantly zeroes.
+
+  Resource : Graph integrity.
+  Risk     : Self-fragmentation. Expanding can REDUCE your score.
+  Reward   : Connected, defensible area that compounds into structures.
+
+  WHY IT IS MEMORABLE
+    Wireframes. Circuits, mycelium, neural nets.
+    Nobody else in .io produces this silhouette, and it reads as a different
+    genre entirely.
+
+  KILL-TEST
+    Do players understand "only your biggest piece counts" BEFORE their first
+    split? If they split and do not know why, it feels like a bug and they
+    leave.
+
+
+================================================================================
+4.  SHADOW -- THE LANTERN
+================================================================================
+
+  EXPLOITS
+    Every threat in the genre is anonymous -- a leaderboard bar, a clock, a
+    score going down. Nothing has a face.
+    Shadow replaces every timer with A VISIBLE ENEMY THAT HAS A POSITION.
+
+  CORE MECHANIC
+    A roaming light source crosses the arena. Ground it touches cannot be
+    claimed. Close a loop in darkness and it is yours.
+
+  Resource : Safe unlit ground.
+  Risk     : A visible hunter you can see coming and probably cannot outrun.
+  Reward   : Shadow area, plus the satisfaction of out-planning something
+              with intent.
+
+  WHY IT IS MEMORABLE
+    Every screenshot has a CHARACTER in it -- a shape with a position and a
+    direction.
+    It converts anonymous pressure into a specific enemy, which is the
+    cleanest possible fix for the "the game took my points" blame problem.
+
+  KILL-TEST
+    Is the hunter predictable enough to play against but unpredictable enough
+    to be frightening?
+    Predictable  -> it is scenery.
+    Unpredictable-> it is unfair.
+    This balance is the whole project.
+
+
+================================================================================
+5.  FORGE -- THE COOLING LAND
+================================================================================
+
+  EXPLOITS
+    Zero-maintenance territory is load-bearing.
+    The analysis proved permanent assets are what make greed correct.
+    Forge converts it to a MAINTAINED asset -- the exact change TIDE was
+    reaching for, but without a clock.
+
+  CORE MECHANIC
+    Freshly captured territory is white-hot and cools.
+    Cold land returns to neutral.
+    You re-heat it by sailing over it.
+
+  Resource : Heat -- regenerates only while moving.
+  Risk     : A maintenance tax. Movement spent defending is movement not
+              spent expanding.
+  Reward   : Held area, plus a heat bonus on land you just banked.
+
+  WHY IT IS MEMORABLE
+    Your land GLOWS AND FADES, and you can watch a rival's territory going
+    grey from across the map.
+    Critically, every loss is traceable to a choice YOU made. Nothing is ever
+    taken by a clock you did not author.
+
+  KILL-TEST
+    Do players ever choose to maintain over expanding?
+    If they never do, it is decoration and must be cut.
+
+
+================================================================================
+RANKING
+================================================================================
+
+  SCORING CONVENTION
+    1 to 5, where 5 is BEST.
+    For DEVELOPMENT COST, 5 = CHEAPEST.
+
+  CONCEPT            REPLAY-  RETEN-  SIMPLE-  VIRAL  DEV COST   TOTAL
+                     ABILITY   TION     ITY              (5=cheap)
+  -----------------  -------  -------  -------  -----  --------  ------
+  TIDE (revised)        3        3        5       4       3        18
+  FORGE                 4        5        4       3       3        19
+  QUARRY                4        3        4       5       3        19
+  LATTICE               4        5        2       2       2        15
+  SHADOW                4        3        4       4       2        17
+
+
+WHY THE SCORES READ THAT WAY
+--------------------------------------------------------------------------------
+  REPLAYABILITY
+    Lattice and Forge top out at 4 because routing stays fresh longest.
+    Quarry and Shadow score 4 on genuinely emergent variation.
+    TIDE scores 3 because route choice is a narrower decision set than the
+    others.
+
+  RETENTION
+    Forge and Lattice score 5. Both create a genuine TWO-WAY decision
+    (expand vs. maintain / expand vs. stay connected) that survives hundreds
+    of matches. Quarry and TIDE score 3 because the strategic question is
+    narrower. Shadow scores 3 because its depth depends entirely on AI
+    quality.
+
+  SIMPLICITY
+    TIDE scores 5 and it is not close. "Shallow is sand, deep is water" is
+    the whole tutorial.
+    Lattice scores 2 because the rule is one sentence but ABSTRACT, and its
+    failure is invisible until it costs you everything.
+
+  VIRAL POTENTIAL
+    Quarry scores 5. Craters on a flat plane are the most screenshot-able
+    territory visual in the genre, and nobody looks like it.
+    Lattice scores 2. Wireframes are distinctive but hard to explain in a
+    still image.
+
+  DEVELOPMENT COST
+    TIDE, Forge and Quarry sit at 3. Each is roughly one extra array plus one
+    extra rule. Lattice and Shadow score 2. Lattice needs connected-component
+    labelling per player per capture; Shadow needs a roaming AI plus a
+    lighting layer.
+
+
+================================================================================
+AVERAGES DO NOT DECIDE THIS. KILL-TESTS DO.
+================================================================================
+
+  Totals of 19 / 19 / 18 are a tie inside the noise.
+  The tiebreak is a FATAL-RISK FILTER: one structural failure that ends the
+  concept, regardless of average.
+
+  CONCEPT          FATAL RISK                                    SURVIVES?
+  ---------------  --------------------------------------------  ------------
+  TIDE (revised)   Map could read as arbitrary filler with        Depends on
+                   no strategic weight                            map design --
+                                                                 controllable
+                                                                 at design time
+  FORGE            Two economies is two systems. "Go cold and     TUNING
+                   huge" may be degenerate                       problem --
+                                                                 resolve by
+                                                                 capping the
+                                                                 cooling rate
+
+  QUARRY           SNOWBALL. One dominant player excavates       STRUCTURAL.
+                   the map for everyone.                         Not tunable.
+
+  LATTICE          Score loss on split reads as a bug, not a     Design /
+                   lesson                                        communication
+                                                                 risk --
+                                                                 fixable
+
+  SHADOW           The hunter is either scenery or unfairness.   BINARY.
+                   No middle setting exists.                     No middle
+                                                                 setting.
+
+  Two concepts carry STRUCTURAL fatal risk.
+  One of them is the joint-highest scorer.
+
+
+================================================================================
+RECOMMENDATION:  TIDE (REVISED) -- BATHYMETRY
+================================================================================
+
+  ONE concept. Not a portfolio.
+
+
+THE ARGUMENT
+--------------------------------------------------------------------------------
+
+  1. ITS STRENGTH IS THAT ITS SPECIAL THING IS A CONSTRAINT, NOT A SYSTEM.
+     Every rival adds machinery -- a heat economy, a lighting layer, a
+     connectivity solver, a crater system.
+     TIDE adds TERRAIN.
+     There is nothing else to teach, nothing else to balance, nothing else
+     to get wrong.
+     That is why it scores 5 on simplicity while scoring 4 or below on
+     everything else.
+
+
+  2. IT IS THE ONLY ONE OF THE FIVE THAT A SINGLE DOMINANT PLAYER CANNOT
+     BREAK.
+     Quarry is the joint-highest scorer and it is the one I am rejecting.
+     The reason is exactly its strength:
+
+         IT ACCUMULATES, AND ROUNDS DO NOT HAVE TIME.
+
+     In a 3-minute round, once someone hits 40% they have excavated 40% of
+     the arena into unusable rubble, and the remaining 60% is fragmented
+     scraps. Everyone else is now playing a dead map.
+     By the third match of a 10-minute session the arena is unplayable.
+     That is not a tuning problem. That is arithmetic.
+
+
+  3. THE MAP RESETS EVERY ROUND, BY CONSTRUCTION.
+     Bathymetry is fixed at match start.
+     Every round gets a fresh, clean, deliberately designed arena -- which
+     is precisely what a short-round game needs and precisely what an
+     accumulating mechanic cannot provide.
+
+
+  4. IT IS THE CHEAPEST THING TO VALIDATE.
+     Map generation and one passability check are the entire delta.
+     The kill-test is answerable in a single playtest:
+     can a player name a route in 30 seconds?
+
+
+  5. IT OWNS THE ONLY UNOCCUPIED SPACE IN THE COMPETITIVE SET.
+     No game in the research has a designed map as its primary strategic
+     object.
+     Paper.io's arena is a blank square.
+     Paper.io 2's is a blank circle.
+     Hexanaut's is hexagons plus five totems.
+     That gap will not stay open.
+
+
+RUNNER-UP, AND WHY IT LOST
+--------------------------------------------------------------------------------
+  FORGE.
+
+  On the pure decision depth it is the better GAME. Its expand-vs-maintain
+  tension is the strongest single decision in this set, and it has the best
+  fix for TIDE's original blame problem.
+
+  It loses because it needs a second economy, and a second economy in a
+  3-minute browser game is a lot of arithmetic to explain to an eight-year-
+  old.
+
+  IF THE BATHYMETRY KILL-TEST FAILS, FORGE IS WHAT I BUILD INSTEAD.
+  It is the concept to fall back to.
+
+
+REJECTED ON STRUCTURAL GROUNDS
+--------------------------------------------------------------------------------
+  QUARRY   -- snowball
+  SHADOW   -- binary risk, no middle setting exists
+  LATTICE  -- abstract rule whose failure mode reads as a bug
+
+
+================================================================================
+NEXT STEP
+================================================================================
+
+  ONE decision unlocks Phase 1:
+
+  Approve TIDE -- Bathymetry, or name one of the four rivals and I will
+  redesign its brief against the same five criteria.
+
+================================================================================
+                        END OF DOCUMENT
+================================================================================
