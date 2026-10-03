@@ -1,0 +1,21 @@
+{
+  "name": "tide",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TIDE - browser .io-style territory control game. Expand your water territory before the tide takes it back.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  }
+}
