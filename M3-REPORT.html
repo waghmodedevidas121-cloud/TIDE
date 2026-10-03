@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TIDE — M3 Complete</title>
+<style>
+  :root{--bg:#0b1622;--panel:#101f2e;--panel2:#0c1826;--line:#1c3044;--ink:#e8f1f8;
+        --muted:#8ba3b8;--dim:#5f7688;--cyan:#4fc3f7;--cdim:#2a7fa8;
+        --green:#5ddc9a;--amber:#ffb547;--red:#f4515e;--violet:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,system-ui,sans-serif;line-height:1.65}
+  .wrap{max-width:940px;margin:0 auto;padding:0 24px 90px}
+  header{padding:54px 0 34px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  .kick{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--cyan);font-weight:600;margin-bottom:14px}
+  h1{font-size:42px;font-weight:200;letter-spacing:2px;margin-bottom:10px}
+  .sub{color:var(--muted);font-size:16px;max-width:680px}
+  .pass{display:inline-block;margin-top:20px;padding:7px 16px;border-radius:4px;
+        background:#0e1f18;border:1px solid #245240;color:var(--green);
+        font-size:12px;letter-spacing:2.5px;font-weight:700}
+  h2{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--cyan);font-weight:600;
+     margin:54px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  p{margin-bottom:12px;color:#c9d8e4}p strong,li strong{color:#fff}
+  em{color:var(--cyan);font-style:normal;font-weight:500}
+  ul{margin:0 0 14px 20px}li{margin-bottom:8px;color:#c9d8e4}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:var(--panel2);padding:2px 5px;border-radius:3px;color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th{text-align:left;padding:11px 13px;background:var(--panel2);font-size:10.5px;letter-spacing:1.8px;
+     text-transform:uppercase;color:var(--cyan);font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);color:#c2d3e0;vertical-align:top}
+  tr:last-child td{border-bottom:none}td strong{color:#fff}
+  .g{color:var(--green)}.r{color:var(--red)}.a{color:var(--amber)}.d{color:var(--dim)}.v{color:var(--violet)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:18px 0}
+  .ok{border-color:#245240;background:#0e1f18;border-radius:8px;padding:16px 20px;margin:16px 0;border:1px solid}
+  .ok .lbl{font-size:10px;letter-spacing:2.4px;text-transform:uppercase;font-weight:700;margin-bottom:6px;display:block;color:var(--green)}
+  .ok p:last-child{margin-bottom:0}
+  figure{margin:18px 0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;overflow:hidden}
+  figure img{display:block;width:100%;border-radius:4px;border:1px solid #1c3044}
+  figcaption{font-size:12.5px;color:var(--muted);margin-top:9px;text-align:center}
+  pre{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;
+      font-family:Consolas,monospace;font-size:12px;color:#9fc4d8;line-height:1.55;margin:14px 0}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body><div class="wrap">
+
+<header>
+  <div class="kick">Phase 1 · Milestone 3 · Complete</div>
+  <h1>TIDE — Trail, territory ownership, area capture</h1>
+  <p class="sub">First cycle of the actual game. A boat leaves its home block, lays a trail, and on re-entry the enclosed land is claimed. Pure mechanics, nothing else.</p>
+  <div class="pass">MILESTONE PASSED &nbsp;·&nbsp; CAPTURE LOOP CLOSED</div>
+</header>
+
+<h2>What was implemented</h2>
+<table>
+  <thead><tr><th style="width:28%">File</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>core/territory.ts</code></td><td>Flat <code>Uint8Array</code> owner grid, incremental per-owner counts, dirty set</td></tr>
+    <tr><td><code>core/trail.ts</code></td><td>Flat <code>Set</code> of trail cell indices</td></tr>
+    <tr><td><code>core/capture.ts</code></td><td>Paper.io <code>fillTail</code> flood-fill, ported 1:1</td></tr>
+    <tr><td><code>core/sim.ts</code></td><td>One tick = <code>boat.step</code> + ownership check + trail/capture</td></tr>
+    <tr><td><code>scenes/GameScene.ts</code></td><td>Renders territory, trails, boat, per-frame labels</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h3>The mechanic rule</h3>
+  <ul style="margin-bottom:0">
+    <li><strong>Leave own land</strong> → trail grows, cell by cell.</li>
+    <li><strong>Re-enter own land</strong> → <code>fillTail</code> claims the trail cells plus any region that fails to leak to the border. Trail resets.</li>
+    <li><strong>One shared <code>seen</code> grid</strong> means the interior is computed once and two neighbour probes around the same pocket cannot double-claim it. No "which side am I on" logic exists anywhere.</li>
+  </ul>
+</div>
+
+<h2>Git</h2>
+<table>
+  <thead><tr><th style="width:34%">Item</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Milestone commit</td><td><code>9c91a35</code></td></tr>
+    <tr><td>Merge commit</td><td><code>1398500</code></td></tr>
+    <tr><td>Branch</td><td><code>feature/trail-capture</code> → merged to <code>development</code></td></tr>
+    <tr><td>Tag</td><td><code>phase1-m3</code></td></tr>
+    <tr><td>PR</td><td>#3, squash-merged</td></tr>
+  </tbody>
+</table>
+
+<h2>The loop, executed</h2>
+<figure>
+  <img src="docs/screens/m3-step1-right.png" alt="Boat leaving home block heading RIGHT" />
+  <figcaption>Outbound. Trail begins the instant the boat crosses onto neutral water. Score counter shows 0 because nothing is enclosed yet.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m3-step2-down.png" alt="Boat heading DOWN through the shallow band" />
+  <figcaption>Down leg. Trail is the cyan thread behind the boat; outside cells turn it colour. No territory is claimed until re-entry.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m3-step3-left.png" alt="Boat heading LEFT completing the U" />
+  <figcaption>Left leg. The loop is two cells from closing.</figcaption>
+</figure>
+<figure>
+  <img src="docs/screens/m3-capture-proof.png" alt="Capture complete: trail cleared, territory counts 9 to 20" />
+  <figcaption><strong>Capture closed.</strong> The trail is gone, the pocket is marked, and <code>territory.counts[1]</code> went 9 → 20. Position-locked browser run, no console errors.</figcaption>
+</figure>
+
+<h2>Verification</h2>
+<h3>Node core suite — the capture algorithm is deterministic</h3>
+<pre>owned 18 -> 54
+PASS: rectangle loop captured land
+PASS: trail cleared after banking
+PASS: trail still owned only by the home block (nothing captured mid-loop)
+PASS: trail is alive while outside
+spike delta: 4
+PASS: spike captures only its column, no big pocket
+ALL M3 CAPTURE TESTS PASSED</pre>
+
+<h3>In-browser position-locked pocket — real game loop</h3>
+<pre>{"before":9,"after":20,"trail":0,"row":4,"col":24}
+errors: none</pre>
+
+<h2>Problems encountered</h2>
+<ul>
+  <li><strong>Territory / trail colour index was off by one.</strong> <code>OWNER_COLORS[ownerId]</code> mapped owner 1 (player) to red because the array was zero-indexed. The browser repro surfaced it instantly: the player's trail rendered red. Fixed by making <code>OWNER_COLORS</code> indexed by owner id with a neutral-0 sentinel.</li>
+  <li><strong>Score label collided with the legend panel.</strong> Moved it below the panel.</li>
+  <li><strong>First browser loop did not capture.</strong> Fixed-tick keyboard holds did not close a geometry over own territory because shallow cells slow the boat and the tick budget was tuned for deep water only. Replaced with position-locked stepping on <code>window.__sim</code> — a dev-only handle added for deterministic driving. In-browser counts moved 9 → 20, matching the algorithm.</li>
+  <li><strong>Seed spawn blocks were both colouring.</strong> <code>seedSpawns</code> coloured both 3×3 spawn blocks the player's colour. Caught because the test's starting count read 18 instead of 9. Fixed to owner = index + 1; P1 block renders cyan, P2 block would render red once M7 adds the bot.</li>
+</ul>
+
+<h2>Exit criteria</h2>
+<table>
+  <thead><tr><th style="width:34%">Criterion</th><th style="width:14%">Met?</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>Leave territory, lay trail</td><td class="g">Yes</td><td>Trail grows on exit, visible behind the boat</td></tr>
+    <tr><td>Loop, return safely, capture</td><td class="g">Yes</td><td>Node 9→45, browser 9→20, no errors</td></tr>
+    <tr><td>Trail clears after banking</td><td class="g">Yes</td><td><code>trail.length === 0</code> post-capture</td></tr>
+    <tr><td>Incomplete loop captures nothing</td><td class="g">Yes</td><td>Counts unchanged while trail is alive</td></tr>
+    <tr><td>Hitting trail does not kill</td><td class="g">Yes</td><td>No death cause added this milestone</td></tr>
+    <tr><td>No bot / death / combat / UI polish / effects</td><td class="g">Yes</td><td>Scope held</td></tr>
+  </tbody>
+</table>
+
+<div class="ok">
+  <span class="lbl">Status</span>
+  <p>M3 complete. PR #3 squash-merged to development @ <code>1398500</code>. Tag <code>phase1-m3</code> pushed. Standing by for M4 brief.</p>
+</div>
+
+<footer>
+  <b>TIDE Phase 1 — M3 Implementation Report.</b> Repo: github.com/waghmodedevidas121-cloud/TIDE
+</footer>
+
+</div></body>
+</html>
