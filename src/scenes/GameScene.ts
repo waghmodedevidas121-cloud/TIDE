@@ -1,7 +1,15 @@
 import Phaser from 'phaser';
-import { CELL_PX, Dir, DIR_NAME, GRID, TICK_MS, WORLD_PX } from '../core/constants';
+import {
+  CELL_PX,
+  Dir,
+  DIR_NAME,
+  GRID,
+  TICK_MS,
+  WORLD_PX,
+} from '../core/constants';
 import type { GameMap } from '../core/mapLoader';
 import { Boat } from '../core/boat';
+import { Sim } from '../core/sim';
 import {
   formatChecks,
   runMapChecks,
@@ -21,16 +29,19 @@ interface GameSceneData {
   map: GameMap;
 }
 
-/**
- * Phase 1 / M2: player boat, terrain speed, sand blocking, spawn points.
- * Terrain is static; the camera is fixed to the whole map (success condition).
- * Debug overlays are always on, per the Phase 1 directive.
- */
+// Indexed by owner id exactly: 0 neutral (unused), 1 = player cyan, 2 = red.
+const OWNER_COLORS = [0x1c3044, 0x4fc3f7, 0xf4515e];
+
 export class GameScene extends Phaser.Scene {
   private map!: GameMap;
-  private boat!: Boat;
+  private sim!: Sim;
+  private player!: Boat;
+  private territoryGfx!: Phaser.GameObjects.Graphics;
+  private trailGfx!: Phaser.GameObjects.Graphics;
   private boatGfx!: Phaser.GameObjects.Graphics;
   private summary!: CheckSummary;
+  private scoreLabel!: Phaser.GameObjects.Text;
+  private speedLabel!: Phaser.GameObjects.Text;
 
   private accumulatorMs = 0;
   private readonly MAX_STEPS = 4;
@@ -52,7 +63,12 @@ export class GameScene extends Phaser.Scene {
     paintTerrain(this, this.map);
     paintCellGrid(this);
 
-    this.boat = Boat.atSpawn(0, Dir.RIGHT);
+    this.sim = new Sim(this.map);
+    this.player = Boat.atSpawn(0, Dir.RIGHT, 1);
+    this.sim.addBoat(this.player);
+
+    this.territoryGfx = this.add.graphics().setDepth(2);
+    this.trailGfx = this.add.graphics().setDepth(3);
     this.boatGfx = this.add.graphics().setDepth(10);
 
     this.summary = runMapChecks(this.map, GRID);
@@ -62,6 +78,13 @@ export class GameScene extends Phaser.Scene {
     this.drawChecksPanel();
     this.drawLegend();
     this.registerInput();
+    this.addScoreLabel();
+
+    // Dev-only handle so a deterministic test can drive the sim without
+    // relying on fragile keyboard timing.
+    (window as unknown as { __sim: Sim }).__sim = this.sim;
+
+    this.redrawTerritory();
 
     document.getElementById('boot')?.classList.add('hidden');
   }
@@ -70,44 +93,83 @@ export class GameScene extends Phaser.Scene {
     this.accumulatorMs += Math.min(deltaMs, 250);
     let steps = 0;
     while (this.accumulatorMs >= TICK_MS && steps < this.MAX_STEPS) {
-      this.boat.step(this.map);
+      this.sim.step();
       this.accumulatorMs -= TICK_MS;
       steps += 1;
     }
     if (steps === this.MAX_STEPS) this.accumulatorMs = 0;
 
-    this.boatGfx.clear();
-    drawBoat(
-      this.boatGfx,
-      this.boat.worldX(),
-      this.boat.worldY(),
-      BOAT_COLORS[0],
-      this.boat.blocked,
-    );
-
-    this.updateSpeedLabel();
+    if (this.sim.territory.dirty.size > 0) this.redrawTerritory();
+    this.redrawTrails();
+    this.redrawBoat();
+    this.updateLabels();
   }
 
-  private speedLabel!: Phaser.GameObjects.Text;
-  private updateSpeedLabel(): void {
-    const terrain =
-      this.boat.currentCell().row >= 0 &&
-      this.boat.currentCell().row < GRID &&
-      this.boat.currentCell().col >= 0 &&
-      this.boat.currentCell().col < GRID
-        ? this.map.terrain[
-            this.boat.currentCell().row * GRID + this.boat.currentCell().col
-          ]
-        : 2;
-    const name = terrain === 1 ? 'SHALLOW  0.5x' : terrain === 0 ? 'DEEP  1.0x' : 'SAND';
-    if (!this.speedLabel) {
-      this.speedLabel = this.add.text(10, WORLD_PX - 40, '', {
-        fontFamily: 'Consolas, monospace',
-        fontSize: '13px',
-        color: '#e8f1f8',
-      });
+  private redrawTerritory(): void {
+    this.territoryGfx.clear();
+    const size = this.sim.territory.size;
+    const n = size * size;
+    for (let i = 0; i < n; i++) {
+      const owner = this.sim.territory.getAtIndex(i);
+      if (owner === 0) continue;
+      const r = Math.floor(i / size);
+      const c = i % size;
+      this.territoryGfx.fillStyle(OWNER_COLORS[owner] ?? 0xffffff, 0.45);
+      this.territoryGfx.fillRect(c * CELL_PX, r * CELL_PX, CELL_PX, CELL_PX);
     }
-    this.speedLabel.setText(`cell: ${name}   heading: ${DIR_NAME[this.boat.heading]}`);
+    this.sim.territory.resetDirty();
+  }
+
+  private redrawTrails(): void {
+    this.trailGfx.clear();
+    for (const boat of this.sim.boats) {
+      this.trailGfx.fillStyle(OWNER_COLORS[boat.ownerId] ?? 0xffffff, 1);
+      for (const idx of boat.trail.cells) {
+        const r = Math.floor(idx / GRID);
+        const c = idx % GRID;
+        this.trailGfx.fillRect(c * CELL_PX, r * CELL_PX, CELL_PX, CELL_PX);
+      }
+    }
+  }
+
+  private redrawBoat(): void {
+    this.boatGfx.clear();
+    for (let i = 0; i < this.sim.boats.length; i++) {
+      const b = this.sim.boats[i];
+      drawBoat(this.boatGfx, b.worldX(), b.worldY(), BOAT_COLORS[i] ?? 0xffffff, b.blocked);
+    }
+  }
+
+  private addScoreLabel(): void {
+    this.scoreLabel = this.add
+      .text(10, 80, '', {
+        fontFamily: 'Consolas, monospace',
+        fontSize: '14px',
+        color: '#e8f1f8',
+      })
+      .setDepth(20);
+  }
+
+  private updateLabels(): void {
+    const share = Math.floor(this.sim.territory.share(1) * 100);
+    this.scoreLabel.setText(`score ${share}%`);
+
+    const cell = this.player.currentCell();
+    const idx = cell.row * GRID + cell.col;
+    const t = this.map.terrain[idx];
+    const name = t === 1 ? 'SHALLOW  0.5x' : t === 0 ? 'DEEP  1.0x' : 'SAND';
+    if (!this.speedLabel) {
+      this.speedLabel = this.add
+        .text(10, WORLD_PX - 40, '', {
+          fontFamily: 'Consolas, monospace',
+          fontSize: '13px',
+          color: UI_TEXT,
+        })
+        .setDepth(20);
+    }
+    this.speedLabel.setText(
+      `cell: ${name}   heading: ${DIR_NAME[this.player.heading]}   trail: ${this.player.trail.length}`,
+    );
   }
 
   private registerInput(): void {
@@ -116,22 +178,22 @@ export class GameScene extends Phaser.Scene {
         case 'ArrowUp':
         case 'w':
         case 'W':
-          this.boat.input(Dir.UP);
+          this.player.input(Dir.UP);
           break;
         case 'ArrowDown':
         case 's':
         case 'S':
-          this.boat.input(Dir.DOWN);
+          this.player.input(Dir.DOWN);
           break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
-          this.boat.input(Dir.LEFT);
+          this.player.input(Dir.LEFT);
           break;
         case 'ArrowRight':
         case 'd':
         case 'D':
-          this.boat.input(Dir.RIGHT);
+          this.player.input(Dir.RIGHT);
           break;
       }
     });
@@ -144,11 +206,11 @@ export class GameScene extends Phaser.Scene {
       const dx = p.x - this.touchStartX;
       const dy = p.y - this.touchStartY;
       const abs = Math.max(Math.abs(dx), Math.abs(dy));
-      if (abs < 24) return; // tap, not swipe
+      if (abs < 24) return;
       if (Math.abs(dx) > Math.abs(dy)) {
-        this.boat.input(dx > 0 ? Dir.RIGHT : Dir.LEFT);
+        this.player.input(dx > 0 ? Dir.RIGHT : Dir.LEFT);
       } else {
-        this.boat.input(dy > 0 ? Dir.DOWN : Dir.UP);
+        this.player.input(dy > 0 ? Dir.DOWN : Dir.UP);
       }
     });
   }
@@ -236,7 +298,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         WORLD_PX / 2,
         WORLD_PX - 8,
-        `${GRID}x${GRID} grid  ·  speed varies by terrain  ·  WASD / arrows / swipe`,
+        `${GRID}x${GRID} grid  ·  WASD / arrows / swipe`,
         { fontFamily: 'Consolas, monospace', fontSize: '11px', color: UI_TEXT },
       )
       .setOrigin(0.5, 1);
